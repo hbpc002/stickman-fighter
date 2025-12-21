@@ -1,3 +1,6 @@
+test02/
+test01/
+newtest/
 # Python
 __pycache__/
 *.py[cod]
@@ -65,3 +68,30 @@ docker-compose.yml
 *.db
 *.sqlite3
 *.sqlite
+
+# Claude and Happy (local dev tools)
+.claude/
+.happy/
+*.claude.json*
+*.claude.json.backup
+*.claude.json.corrupted.*
+upload_new_files.sh
+upload_to_github.sh
+test01/
+test02/
+newtest/
+node-v20.11.0-linux-x64/
+*.tar.xz
+.bash_history
+.lesshst
+.wget-hsts
+.cache/
+.config/
+.local/
+.npm/
+.n8n/
+.ssh/
+.bash_logout
+.bashrc
+.profile
+.sudo_as_admin_successful
