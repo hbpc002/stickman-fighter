@@ -1,6 +1,10 @@
 test02/
 test01/
 newtest/
+.claude/
+upload_to_github.sh
+upload_new_files.sh
+
 # Python
 __pycache__/
 *.py[cod]
