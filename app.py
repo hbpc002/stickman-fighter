@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2
-两侧放置控制按钮，最大化游戏画面，支持全屏模式
+🔥 火柴人对战游戏 - 横屏移动优化版 V2.1
+修复版：底部栏可见、全屏按钮、玩家2按钮响应
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -9,7 +9,6 @@ import os
 
 app = Flask(__name__)
 
-# 横屏优化版HTML模板 - 两侧放置控制按钮
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -67,11 +66,6 @@ HTML_TEMPLATE = """
             color: #ffd93d;
         }
 
-        .portrait-warning p {
-            font-size: 1.2em;
-            opacity: 0.8;
-        }
-
         .portrait-warning .icon {
             font-size: 4em;
             margin-bottom: 20px;
@@ -93,36 +87,39 @@ HTML_TEMPLATE = """
             justify-content: center;
             gap: 5px;
             padding: 5px;
+            position: relative;
         }
 
         /* 左侧控制面板 - 玩家1 */
         .control-panel-left {
-            width: 80px;
-            height: 100%;
+            width: 75px;
+            height: calc(100% - 70px);
             display: flex;
             flex-direction: column;
             gap: 5px;
             align-items: center;
             justify-content: center;
             padding: 10px 5px;
-            background: rgba(255, 107, 107, 0.15);
+            background: rgba(255, 107, 107, 0.2);
             border-radius: 8px;
             backdrop-filter: blur(5px);
+            margin-top: 30px;
         }
 
         /* 右侧控制面板 - 玩家2 */
         .control-panel-right {
-            width: 80px;
-            height: 100%;
+            width: 75px;
+            height: calc(100% - 70px);
             display: flex;
             flex-direction: column;
             gap: 5px;
             align-items: center;
             justify-content: center;
             padding: 10px 5px;
-            background: rgba(77, 171, 247, 0.15);
+            background: rgba(77, 171, 247, 0.2);
             border-radius: 8px;
             backdrop-filter: blur(5px);
+            margin-top: 30px;
         }
 
         /* 游戏区域 */
@@ -132,9 +129,10 @@ HTML_TEMPLATE = """
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100%;
+            height: calc(100% - 70px);
             position: relative;
             max-width: calc(100vw - 180px);
+            margin-top: 30px;
         }
 
         /* 画布容器 */
@@ -158,21 +156,6 @@ HTML_TEMPLATE = """
         }
 
         /* 控制按钮样式 */
-        .control-btn-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            width: 100%;
-            align-items: center;
-        }
-
-        .control-row {
-            display: flex;
-            gap: 5px;
-            width: 100%;
-            justify-content: center;
-        }
-
         .btn {
             width: 100%;
             min-height: 45px;
@@ -197,11 +180,6 @@ HTML_TEMPLATE = """
             transform: scale(0.95);
         }
 
-        .btn.small {
-            min-height: 40px;
-            font-size: 1em;
-        }
-
         .btn.move {
             background: rgba(77, 171, 247, 0.3);
             border-color: rgba(77, 171, 247, 0.6);
@@ -218,21 +196,9 @@ HTML_TEMPLATE = """
             border-color: rgba(255, 107, 107, 0.6);
         }
 
-        .btn.attack:active {
-            background: rgba(255, 107, 107, 0.6);
-        }
-
-        .btn.jump:active {
-            background: rgba(107, 207, 127, 0.6);
-        }
-
-        .btn.move:active {
-            background: rgba(77, 171, 247, 0.6);
-        }
-
         /* 玩家标签 */
         .player-label {
-            font-size: 0.9em;
+            font-size: 0.85em;
             font-weight: bold;
             text-align: center;
             margin-bottom: 5px;
@@ -243,56 +209,48 @@ HTML_TEMPLATE = """
         }
 
         .player-label.p1 {
-            background: rgba(255, 107, 107, 0.3);
+            background: rgba(255, 107, 107, 0.4);
             color: #ff6b6b;
         }
 
         .player-label.p2 {
-            background: rgba(77, 171, 247, 0.3);
+            background: rgba(77, 171, 247, 0.4);
             color: #4dabf7;
         }
 
         /* 顶部状态栏 */
         .status-bar-top {
             position: absolute;
-            top: 10px;
+            top: 5px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 15px;
+            gap: 10px;
             z-index: 5;
             pointer-events: none;
         }
 
         .player-status-mini {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 10px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(5px);
-            min-width: 120px;
-        }
-
-        .player-status-mini.p1 {
-            border-color: rgba(255, 107, 107, 0.5);
-        }
-
-        .player-status-mini.p2 {
-            border-color: rgba(77, 171, 247, 0.5);
+            min-width: 110px;
         }
 
         .mini-name {
-            font-size: 0.8em;
+            font-size: 0.75em;
             font-weight: bold;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .mini-hp {
-            height: 8px;
+            height: 6px;
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
 
         .mini-hp-fill {
@@ -301,9 +259,9 @@ HTML_TEMPLATE = """
         }
 
         .mini-stamina {
-            height: 6px;
+            height: 4px;
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            border-radius: 2px;
             overflow: hidden;
         }
 
@@ -315,15 +273,15 @@ HTML_TEMPLATE = """
         /* 连击指示器 */
         .combo-indicator {
             position: absolute;
-            top: 60px;
+            top: 50px;
             left: 50%;
             transform: translateX(-50%);
             font-weight: bold;
-            font-size: 1.2em;
+            font-size: 1.1em;
             color: #ffd93d;
             text-shadow: 0 0 10px rgba(255, 217, 61, 0.8);
-            background: rgba(0, 0, 0, 0.6);
-            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
             border-radius: 8px;
             z-index: 5;
             display: none;
@@ -346,13 +304,13 @@ HTML_TEMPLATE = """
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.95);
-            padding: 25px;
+            padding: 20px;
             border-radius: 12px;
             text-align: center;
             display: none;
             z-index: 100;
             border: 2px solid rgba(255, 255, 255, 0.3);
-            min-width: 280px;
+            min-width: 240px;
             animation: popIn 0.3s ease-out;
         }
 
@@ -366,28 +324,10 @@ HTML_TEMPLATE = """
         }
 
         .winner-text {
-            font-size: 1.6em;
+            font-size: 1.4em;
             margin-bottom: 15px;
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-        }
-
-        .overlay-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-        }
-
-        .overlay-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1em;
         }
 
         /* 模式指示器 */
@@ -398,7 +338,7 @@ HTML_TEMPLATE = """
             background: rgba(0, 0, 0, 0.7);
             padding: 4px 8px;
             border-radius: 6px;
-            font-size: 0.75em;
+            font-size: 0.7em;
             font-weight: bold;
             z-index: 5;
             backdrop-filter: blur(5px);
@@ -414,37 +354,55 @@ HTML_TEMPLATE = """
             color: #ff6b6b;
         }
 
-        /* 底部功能按钮 */
+        /* 底部功能按钮 - 修复版 */
         .bottom-controls {
-            position: absolute;
-            bottom: 10px;
+            position: fixed;
+            bottom: 15px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             gap: 8px;
-            z-index: 5;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 95vw;
         }
 
         .func-btn {
-            background: rgba(0, 0, 0, 0.6);
+            background: linear-gradient(135deg, #4dabf7, #3b82f6);
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 8px 12px;
+            border: none;
+            padding: 10px 14px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 0.85em;
             font-weight: bold;
-            backdrop-filter: blur(5px);
             white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            min-width: 60px;
         }
 
         .func-btn:active {
-            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(2px);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
         }
 
         .func-btn.danger {
-            background: rgba(255, 107, 107, 0.4);
-            border-color: rgba(255, 107, 107, 0.6);
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .func-btn.warning {
+            background: linear-gradient(135deg, #ffd93d, #ff6b6b);
+            color: #000;
+        }
+
+        .func-btn.fullscreen {
+            background: linear-gradient(135deg, #6bcf7f, #48bb78);
         }
 
         /* 通知 */
@@ -458,7 +416,7 @@ HTML_TEMPLATE = """
             border-left: 4px solid #ffd93d;
             transform: translateX(400px);
             transition: transform 0.3s ease;
-            z-index: 1000;
+            z-index: 10000;
             max-width: 250px;
             font-size: 0.9em;
             backdrop-filter: blur(10px);
@@ -468,22 +426,11 @@ HTML_TEMPLATE = """
             transform: translateX(0);
         }
 
-        /* 全屏模式样式 */
-        .fullscreen-mode {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 9998;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
         /* 小屏幕优化 */
         @media (max-width: 768px) {
             .control-panel-left,
             .control-panel-right {
-                width: 65px;
+                width: 60px;
             }
 
             .btn {
@@ -496,27 +443,30 @@ HTML_TEMPLATE = """
             }
 
             .player-label {
-                font-size: 0.75em;
+                font-size: 0.7em;
                 padding: 3px;
             }
 
             .status-bar-top {
-                gap: 8px;
+                gap: 5px;
             }
 
             .player-status-mini {
-                padding: 6px 8px;
-                min-width: 100px;
-                font-size: 0.85em;
+                padding: 4px 6px;
+                min-width: 90px;
+                font-size: 0.75em;
             }
 
             .bottom-controls {
                 gap: 5px;
+                padding: 8px;
+                bottom: 10px;
             }
 
             .func-btn {
-                padding: 6px 10px;
+                padding: 8px 10px;
                 font-size: 0.75em;
+                min-width: 50px;
             }
         }
 
@@ -542,20 +492,18 @@ HTML_TEMPLATE = """
         <!-- 左侧控制面板 - 玩家1 -->
         <div class="control-panel-left">
             <div class="player-label p1">🔴 玩家1</div>
-            <div class="control-btn-group">
-                <div class="control-row">
-                    <button class="btn jump" data-key="w">↑</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn move" data-key="a">←</button>
-                    <button class="btn move" data-key="d">→</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn attack" data-key="f">👊</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn attack" data-key="g">🦶</button>
-                </div>
+            <div class="control-row">
+                <button class="btn jump" data-key="w">↑</button>
+            </div>
+            <div class="control-row" style="display: flex; gap: 5px;">
+                <button class="btn move" data-key="a">←</button>
+                <button class="btn move" data-key="d">→</button>
+            </div>
+            <div class="control-row">
+                <button class="btn attack" data-key="f">👊</button>
+            </div>
+            <div class="control-row">
+                <button class="btn attack" data-key="g">🦶</button>
             </div>
         </div>
 
@@ -563,8 +511,8 @@ HTML_TEMPLATE = """
         <div class="game-area">
             <!-- 顶部状态栏 -->
             <div class="status-bar-top">
-                <div class="player-status-mini p1">
-                    <div class="mini-name">🔴 玩家1</div>
+                <div class="player-status-mini">
+                    <div class="mini-name" style="color: #ff6b6b;">🔴 玩家1</div>
                     <div class="mini-hp">
                         <div class="mini-hp-fill" id="p1HpBar" style="width: 100%; background: linear-gradient(90deg, #ff6b6b, #ff8787);"></div>
                     </div>
@@ -572,8 +520,8 @@ HTML_TEMPLATE = """
                         <div class="mini-stamina-fill" id="p1StBar" style="width: 100%; background: linear-gradient(90deg, #4dabf7, #74c0fc);"></div>
                     </div>
                 </div>
-                <div class="player-status-mini p2">
-                    <div class="mini-name">🔵 玩家2</div>
+                <div class="player-status-mini">
+                    <div class="mini-name" style="color: #4dabf7;">🔵 玩家2</div>
                     <div class="mini-hp">
                         <div class="mini-hp-fill" id="p2HpBar" style="width: 100%; background: linear-gradient(90deg, #ff6b6b, #ff8787);"></div>
                     </div>
@@ -596,41 +544,39 @@ HTML_TEMPLATE = """
                 <!-- 游戏结束遮罩 -->
                 <div id="gameOverOverlay" class="game-over-overlay">
                     <div class="winner-text" id="winnerText"></div>
-                    <div class="overlay-buttons">
-                        <button class="overlay-btn" onclick="resetGame()">🔄 再战一局</button>
+                    <div style="margin-top: 15px;">
+                        <button class="btn" onclick="resetGame()" style="width: auto; padding: 10px 20px;">🔄 再战一局</button>
                     </div>
                 </div>
-            </div>
-
-            <!-- 底部功能按钮 -->
-            <div class="bottom-controls">
-                <button class="func-btn" onclick="toggleFullscreen()">🖥️ 全屏</button>
-                <button class="func-btn" onclick="togglePause()">⏸️ 暂停</button>
-                <button class="func-btn" onclick="toggleAI()" id="aiBtn">🤖 AI</button>
-                <button class="func-btn danger" onclick="toggleHardcore()" id="hardcoreBtn">💀 硬核</button>
-                <button class="func-btn" onclick="resetGame()">🔄 重置</button>
             </div>
         </div>
 
         <!-- 右侧控制面板 - 玩家2 -->
         <div class="control-panel-right">
             <div class="player-label p2">🔵 玩家2</div>
-            <div class="control-btn-group">
-                <div class="control-row">
-                    <button class="btn jump" data-key="ArrowUp">↑</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn move" data-key="ArrowLeft">←</button>
-                    <button class="btn move" data-key="ArrowRight">→</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn attack" data-key="j">👊</button>
-                </div>
-                <div class="control-row">
-                    <button class="btn attack" data-key="k">🦶</button>
-                </div>
+            <div class="control-row">
+                <button class="btn jump" data-key="ArrowUp">↑</button>
+            </div>
+            <div class="control-row" style="display: flex; gap: 5px;">
+                <button class="btn move" data-key="ArrowLeft">←</button>
+                <button class="btn move" data-key="ArrowRight">→</button>
+            </div>
+            <div class="control-row">
+                <button class="btn attack" data-key="j">👊</button>
+            </div>
+            <div class="control-row">
+                <button class="btn attack" data-key="k">🦶</button>
             </div>
         </div>
+    </div>
+
+    <!-- 底部功能按钮 - 修复位置 -->
+    <div class="bottom-controls" id="bottomControls">
+        <button class="func-btn fullscreen" onclick="toggleFullscreen()">🖥️ 全屏</button>
+        <button class="func-btn" onclick="togglePause()">⏸️ 暂停</button>
+        <button class="func-btn warning" onclick="toggleAI()" id="aiBtn">🤖 AI</button>
+        <button class="func-btn danger" onclick="toggleHardcore()" id="hardcoreBtn">💀 硬核</button>
+        <button class="func-btn" onclick="resetGame()">🔄 重置</button>
     </div>
 
     <div id="notification" class="notification"></div>
@@ -1227,7 +1173,8 @@ HTML_TEMPLATE = """
             const btn = document.getElementById('aiBtn');
             btn.textContent = gameState.aiEnabled ? '🤖 AI:开' : '🤖 AI';
             btn.style.background = gameState.aiEnabled ?
-                'rgba(255, 107, 107, 0.6)' : 'rgba(0, 0, 0, 0.6)';
+                'linear-gradient(135deg, #ff6b6b, #ee5a24)' :
+                'linear-gradient(135deg, #ffd93d, #ff6b6b)';
 
             updateModeIndicator();
             showNotification(`AI对战: ${gameState.aiEnabled ? '开启' : '关闭'}`, 1500);
@@ -1237,7 +1184,8 @@ HTML_TEMPLATE = """
             gameState.hardcoreMode = !gameState.hardcoreMode;
             const btn = document.getElementById('hardcoreBtn');
             btn.style.background = gameState.hardcoreMode ?
-                'rgba(255, 107, 107, 0.8)' : 'rgba(255, 107, 107, 0.4)';
+                'linear-gradient(135deg, #000, #ff6b6b)' :
+                'linear-gradient(135deg, #ff6b6b, #ee5a24)';
 
             updateModeIndicator();
             showNotification(
@@ -1312,50 +1260,48 @@ HTML_TEMPLATE = """
             }
         }
 
-        // 虚拟按键处理
+        // 虚拟按键处理 - 修复版
         function setupVirtualControls() {
             const buttons = document.querySelectorAll('.btn');
 
             buttons.forEach(btn => {
+                const key = btn.dataset.key;
+                if (!key) return; // 跳过没有data-key的按钮
+
+                // 触摸事件
                 btn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    const key = btn.dataset.key;
-                    if (key) {
-                        keys[key] = true;
-                        initAudio();
-                    }
+                    e.stopPropagation();
+                    keys[key] = true;
+                    initAudio();
+                    console.log('Touch start:', key, keys); // 调试
                 });
 
                 btn.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    const key = btn.dataset.key;
-                    if (key) {
-                        keys[key] = false;
-                    }
+                    e.stopPropagation();
+                    keys[key] = false;
+                    console.log('Touch end:', key, keys); // 调试
                 });
 
+                // 鼠标事件（用于测试）
                 btn.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    const key = btn.dataset.key;
-                    if (key) {
-                        keys[key] = true;
-                        initAudio();
-                    }
+                    e.stopPropagation();
+                    keys[key] = true;
+                    initAudio();
+                    console.log('Mouse down:', key, keys); // 调试
                 });
 
                 btn.addEventListener('mouseup', (e) => {
                     e.preventDefault();
-                    const key = btn.dataset.key;
-                    if (key) {
-                        keys[key] = false;
-                    }
+                    e.stopPropagation();
+                    keys[key] = false;
+                    console.log('Mouse up:', key, keys); // 调试
                 });
 
                 btn.addEventListener('mouseleave', (e) => {
-                    const key = btn.dataset.key;
-                    if (key) {
-                        keys[key] = false;
-                    }
+                    keys[key] = false;
                 });
             });
         }
@@ -1414,24 +1360,24 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-landscape-v2",
-        "version": "3.1",
-        "features": ["landscape_mode", "side_controls", "fullscreen_support", "maximized_canvas"]
+        "service": "stickman-fighter-v2.1",
+        "version": "3.2",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "visible_bottom_bar", "fixed_player2"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter Landscape V2",
-        "version": "3.1",
-        "description": "火柴人对战游戏 - 横屏两侧控制优化版",
+        "game": "Stickman Fighter V2.1",
+        "version": "3.2",
+        "description": "火柴人对战游戏 - 修复版",
         "features": [
-            "两侧放置控制按钮",
+            "两侧控制按钮",
             "最大化游戏画面",
-            "全屏模式支持",
-            "顶部状态栏显示",
-            "底部功能按钮",
-            "自动横屏检测"
+            "可见底部功能栏",
+            "全屏模式按钮",
+            "修复玩家2按钮响应",
+            "顶部状态栏"
         ]
     })
 
@@ -1439,14 +1385,13 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - 横屏两侧控制版 V2")
+    print("🔥 火柴人对战 - V2.1 修复版")
     print("=" * 60)
-    print("🎮 特性:")
-    print("  ✅ 两侧控制按钮 - 左红右蓝")
-    print("  ✅ 最大化游戏画面")
-    print("  ✅ 全屏模式支持")
-    print("  ✅ 顶部状态栏显示生命体力")
-    print("  ✅ 底部功能按钮栏")
+    print("✅ 修复内容:")
+    print("  ✅ 底部栏可见且可点击")
+    print("  ✅ 全屏按钮正常工作")
+    print("  ✅ 玩家2按钮响应修复")
+    print("  ✅ 画面最大化显示")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
     print("=" * 60)
