@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2.2
-修复版：紧凑底部栏、最大化游戏画面、不遮挡游戏
+🔥 火柴人对战游戏 - 横屏移动优化版 V2.3
+修复版：玩家2按钮响应 + 游戏结束重置功能
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -554,7 +554,7 @@ HTML_TEMPLATE = """
                 <div id="gameOverOverlay" class="game-over-overlay">
                     <div class="winner-text" id="winnerText"></div>
                     <div style="margin-top: 15px;">
-                        <button class="btn" onclick="resetGame()" style="width: auto; padding: 10px 20px;">🔄 再战一局</button>
+                        <button class="reset-btn" onclick="resetGame()" style="width: auto; padding: 10px 20px; background: linear-gradient(135deg, #6bcf7f, #48bb78); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">🔄 再战一局</button>
                     </div>
                 </div>
             </div>
@@ -874,6 +874,9 @@ HTML_TEMPLATE = """
             update() {
                 if (gameState.aiEnabled && this.playerNum === 2 && !gameState.gameOver) {
                     this.aiControl(gameState.player1);
+                } else if (this.playerNum === 2 && !gameState.gameOver) {
+                    // 玩家2手动控制
+                    this.handleInput();
                 }
 
                 this.vy += this.gravity;
@@ -1282,6 +1285,10 @@ HTML_TEMPLATE = """
                     e.preventDefault();
                     e.stopPropagation();
                     keys[key] = true;
+                    // 同时设置小写版本（用于兼容）
+                    if (key.length === 1) {
+                        keys[key.toLowerCase()] = true;
+                    }
                     initAudio();
                     console.log('Touch start:', key, keys); // 调试
                 });
@@ -1290,6 +1297,9 @@ HTML_TEMPLATE = """
                     e.preventDefault();
                     e.stopPropagation();
                     keys[key] = false;
+                    if (key.length === 1) {
+                        keys[key.toLowerCase()] = false;
+                    }
                     console.log('Touch end:', key, keys); // 调试
                 });
 
@@ -1298,6 +1308,9 @@ HTML_TEMPLATE = """
                     e.preventDefault();
                     e.stopPropagation();
                     keys[key] = true;
+                    if (key.length === 1) {
+                        keys[key.toLowerCase()] = true;
+                    }
                     initAudio();
                     console.log('Mouse down:', key, keys); // 调试
                 });
@@ -1306,11 +1319,17 @@ HTML_TEMPLATE = """
                     e.preventDefault();
                     e.stopPropagation();
                     keys[key] = false;
+                    if (key.length === 1) {
+                        keys[key.toLowerCase()] = false;
+                    }
                     console.log('Mouse up:', key, keys); // 调试
                 });
 
                 btn.addEventListener('mouseleave', (e) => {
                     keys[key] = false;
+                    if (key.length === 1) {
+                        keys[key.toLowerCase()] = false;
+                    }
                 });
             });
         }
@@ -1369,23 +1388,24 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-v2.2",
-        "version": "3.3",
-        "features": ["landscape_mode", "side_controls", "fullscreen", "compact_bottom_bar", "maximized_canvas", "no_obstruction"]
+        "service": "stickman-fighter-v2.3",
+        "version": "3.4",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "compact_bottom_bar", "maximized_canvas", "player2_fixed", "reset_fixed"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter V2.2",
-        "version": "3.3",
-        "description": "火柴人对战游戏 - 紧凑优化版",
+        "game": "Stickman Fighter V2.3",
+        "version": "3.4",
+        "description": "火柴人对战游戏 - 完整修复版",
         "features": [
             "两侧控制按钮",
             "最大化游戏画面",
             "紧凑底部栏（不遮挡）",
             "全屏模式按钮",
-            "修复玩家2按钮响应",
+            "✅ 修复玩家2按钮响应",
+            "✅ 修复游戏结束重置",
             "顶部状态栏"
         ]
     })
@@ -1394,14 +1414,12 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - V2.2 紧凑优化版")
+    print("🔥 火柴人对战 - V2.3 完整修复版")
     print("=" * 60)
-    print("✅ 优化内容:")
-    print("  ✅ 底部栏更小更紧凑（高度40px）")
-    print("  ✅ 游戏画面最大化（不遮挡）")
-    print("  ✅ 按钮间距减小，更省空间")
-    print("  ✅ 顶部状态栏缩小")
-    print("  ✅ 侧边控制面板优化")
+    print("✅ 修复内容:")
+    print("  ✅ 玩家2按钮响应修复（update方法添加handleInput）")
+    print("  ✅ 游戏结束重置按钮修复（独立class避免冲突）")
+    print("  ✅ 虚拟按键同时设置大小写兼容")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
     print("=" * 60)
