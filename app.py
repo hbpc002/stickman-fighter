@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2.1
-修复版：底部栏可见、全屏按钮、玩家2按钮响应
+🔥 火柴人对战游戏 - 横屏移动优化版 V2.2
+修复版：紧凑底部栏、最大化游戏画面、不遮挡游戏
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -92,34 +92,34 @@ HTML_TEMPLATE = """
 
         /* 左侧控制面板 - 玩家1 */
         .control-panel-left {
-            width: 75px;
-            height: calc(100% - 70px);
+            width: 70px;
+            height: calc(100% - 40px);
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
             align-items: center;
             justify-content: center;
-            padding: 10px 5px;
+            padding: 8px 4px;
             background: rgba(255, 107, 107, 0.2);
             border-radius: 8px;
             backdrop-filter: blur(5px);
-            margin-top: 30px;
+            margin-top: 20px;
         }
 
         /* 右侧控制面板 - 玩家2 */
         .control-panel-right {
-            width: 75px;
-            height: calc(100% - 70px);
+            width: 70px;
+            height: calc(100% - 40px);
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
             align-items: center;
             justify-content: center;
-            padding: 10px 5px;
+            padding: 8px 4px;
             background: rgba(77, 171, 247, 0.2);
             border-radius: 8px;
             backdrop-filter: blur(5px);
-            margin-top: 30px;
+            margin-top: 20px;
         }
 
         /* 游戏区域 */
@@ -129,10 +129,10 @@ HTML_TEMPLATE = """
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: calc(100% - 70px);
+            height: calc(100% - 40px);
             position: relative;
             max-width: calc(100vw - 180px);
-            margin-top: 30px;
+            margin-top: 20px;
         }
 
         /* 画布容器 */
@@ -158,12 +158,12 @@ HTML_TEMPLATE = """
         /* 控制按钮样式 */
         .btn {
             width: 100%;
-            min-height: 45px;
+            min-height: 40px;
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.4);
             color: white;
-            border-radius: 8px;
-            font-size: 1.2em;
+            border-radius: 6px;
+            font-size: 1.1em;
             font-weight: bold;
             cursor: pointer;
             user-select: none;
@@ -173,6 +173,7 @@ HTML_TEMPLATE = """
             justify-content: center;
             transition: all 0.1s;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            padding: 2px;
         }
 
         .btn:active {
@@ -225,18 +226,18 @@ HTML_TEMPLATE = """
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 10px;
+            gap: 6px;
             z-index: 5;
             pointer-events: none;
         }
 
         .player-status-mini {
-            background: rgba(0, 0, 0, 0.8);
-            padding: 6px 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(5px);
-            min-width: 110px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(4px);
+            min-width: 90px;
         }
 
         .mini-name {
@@ -357,34 +358,40 @@ HTML_TEMPLATE = """
         /* 底部功能按钮 - 修复版 */
         .bottom-controls {
             position: fixed;
-            bottom: 15px;
+            bottom: 8px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 8px;
+            gap: 4px;
             z-index: 1000;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            flex-wrap: wrap;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 8px;
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-wrap: nowrap;
             justify-content: center;
             max-width: 95vw;
+            height: 40px;
+            align-items: center;
         }
 
         .func-btn {
             background: linear-gradient(135deg, #4dabf7, #3b82f6);
             color: white;
             border: none;
-            padding: 10px 14px;
-            border-radius: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.85em;
+            font-size: 0.75em;
             font-weight: bold;
             white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            min-width: 60px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            min-width: 45px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .func-btn:active {
@@ -458,15 +465,17 @@ HTML_TEMPLATE = """
             }
 
             .bottom-controls {
-                gap: 5px;
-                padding: 8px;
-                bottom: 10px;
+                gap: 3px;
+                padding: 4px 6px;
+                bottom: 5px;
+                height: 36px;
             }
 
             .func-btn {
-                padding: 8px 10px;
-                font-size: 0.75em;
-                min-width: 50px;
+                padding: 5px 8px;
+                font-size: 0.7em;
+                min-width: 40px;
+                height: 26px;
             }
         }
 
@@ -1360,21 +1369,21 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-v2.1",
-        "version": "3.2",
-        "features": ["landscape_mode", "side_controls", "fullscreen", "visible_bottom_bar", "fixed_player2"]
+        "service": "stickman-fighter-v2.2",
+        "version": "3.3",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "compact_bottom_bar", "maximized_canvas", "no_obstruction"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter V2.1",
-        "version": "3.2",
-        "description": "火柴人对战游戏 - 修复版",
+        "game": "Stickman Fighter V2.2",
+        "version": "3.3",
+        "description": "火柴人对战游戏 - 紧凑优化版",
         "features": [
             "两侧控制按钮",
             "最大化游戏画面",
-            "可见底部功能栏",
+            "紧凑底部栏（不遮挡）",
             "全屏模式按钮",
             "修复玩家2按钮响应",
             "顶部状态栏"
@@ -1385,13 +1394,14 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - V2.1 修复版")
+    print("🔥 火柴人对战 - V2.2 紧凑优化版")
     print("=" * 60)
-    print("✅ 修复内容:")
-    print("  ✅ 底部栏可见且可点击")
-    print("  ✅ 全屏按钮正常工作")
-    print("  ✅ 玩家2按钮响应修复")
-    print("  ✅ 画面最大化显示")
+    print("✅ 优化内容:")
+    print("  ✅ 底部栏更小更紧凑（高度40px）")
+    print("  ✅ 游戏画面最大化（不遮挡）")
+    print("  ✅ 按钮间距减小，更省空间")
+    print("  ✅ 顶部状态栏缩小")
+    print("  ✅ 侧边控制面板优化")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
     print("=" * 60)
