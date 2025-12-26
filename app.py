@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2.4
-优化版：增大按钮、修复重置、更好操作体验
+🔥 火柴人对战游戏 - 横屏移动优化版 V2.5
+修复版：游戏循环持续运行，重置后立即恢复
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -1099,11 +1099,13 @@ HTML_TEMPLATE = """
         }
 
         function gameLoop() {
-            if (gameState.paused || gameState.gameOver) {
-                if (gameState.gameOver) {
-                    drawGame();
-                    return;
-                }
+            if (gameState.paused) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            if (gameState.gameOver) {
+                drawGame();
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -1451,21 +1453,22 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-v2.4",
-        "version": "3.5",
-        "features": ["landscape_mode", "side_controls", "fullscreen", "larger_buttons", "better_usability", "player2_fixed", "reset_fixed"]
+        "service": "stickman-fighter-v2.5",
+        "version": "3.6",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "larger_buttons", "game_loop_continuous", "player2_fixed", "reset_fixed"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter V2.4",
-        "version": "3.5",
-        "description": "火柴人对战游戏 - 操作优化版",
+        "game": "Stickman Fighter V2.5",
+        "version": "3.6",
+        "description": "火柴人对战游戏 - 完整修复版",
         "features": [
             "✅ 增大侧边按钮（更好操作）",
             "✅ 修复玩家2按钮响应",
-            "✅ 修复游戏结束重置",
+            "✅ 修复游戏结束重置（循环持续运行）",
+            "✅ 游戏循环永不停止",
             "最大化游戏画面",
             "紧凑底部栏（不遮挡）",
             "全屏模式按钮",
@@ -1477,12 +1480,12 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - V2.4 操作优化版")
+    print("🔥 火柴人对战 - V2.5 完整修复版")
     print("=" * 60)
-    print("✅ 优化内容:")
+    print("✅ 修复内容:")
+    print("  ✅ 游戏循环永不停止（gameOver时也继续循环）")
+    print("  ✅ 重置后立即恢复游戏运行")
     print("  ✅ 侧边按钮增大（85px宽，48-52px高）")
-    print("  ✅ 按钮更醒目（更亮的颜色，阴影效果）")
-    print("  ✅ 重置按钮独立事件监听器")
     print("  ✅ 玩家2按钮响应修复")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
