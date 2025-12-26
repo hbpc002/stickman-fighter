@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 增强创意版
-支持手机端虚拟按键，全新特效，更多创意功能
+🔥 火柴人对战游戏 - 横屏移动优化版
+专为手机端优化的横屏显示，透明虚拟按键覆盖在画面上方
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -9,14 +9,16 @@ import os
 
 app = Flask(__name__)
 
-# 增强版HTML模板 - 包含手机端虚拟按键
+# 横屏优化版HTML模板 - 透明虚拟按键在画面上方
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🔥 火柴人对战 - 创意增强版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🔥 火柴人对战 - 横屏版</title>
     <style>
         * {
             margin: 0;
@@ -28,65 +30,92 @@ HTML_TEMPLATE = """
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            touch-action: manipulation;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 横屏提示 */
+        .portrait-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .portrait-warning.show {
+            display: flex;
+        }
+
+        .portrait-warning h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #ffd93d;
+        }
+
+        .portrait-warning p {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .portrait-warning .icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            animation: rotate 1s infinite;
+        }
+
+        @keyframes rotate {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(90deg); }
+        }
+
+        /* 主容器 - 横屏优化 */
+        .main-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        /* 游戏区域容器 */
+        .game-section {
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            color: white;
-            padding: 10px;
-            overflow-x: hidden;
-            touch-action: manipulation;
-        }
-
-        .container {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 20px;
-            padding: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(15px);
-            max-width: 1000px;
-            width: 100%;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
+            max-width: 70%;
+            height: 100%;
             position: relative;
         }
 
-        h1 {
-            font-size: 2em;
-            margin-bottom: 5px;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
-            background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .device-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: bold;
-            margin-top: 5px;
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .game-area {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .canvas-container {
+        /* 画布容器 - 相对定位用于放置透明按键 */
+        .canvas-wrapper {
             position: relative;
             display: flex;
+            align-items: center;
             justify-content: center;
             width: 100%;
+            height: 100%;
+            max-height: 80vh;
         }
 
         #gameCanvas {
@@ -95,59 +124,170 @@ HTML_TEMPLATE = """
             background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
             max-width: 100%;
-            height: auto;
+            max-height: 100%;
             display: block;
         }
 
-        .game-over-overlay {
+        /* 透明虚拟按键 - 覆盖在画面上方 */
+        .transparent-virtual-controls {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
             display: none;
-            z-index: 100;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            min-width: 280px;
-            animation: popIn 0.3s ease-out;
         }
 
-        .game-over-overlay.show {
+        .transparent-virtual-controls.show {
             display: block;
         }
 
-        @keyframes popIn {
-            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        /* 按键区域 - 上半部分 */
+        .control-overlay-top {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: auto;
         }
 
-        .winner-text {
-            font-size: 1.8em;
-            margin-bottom: 15px;
+        .control-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* 透明按钮样式 */
+        .transparent-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 1.1em;
             font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+            transition: all 0.1s;
+            backdrop-filter: blur(5px);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            flex: 1;
+            max-width: 80px;
+        }
+
+        .transparent-btn:active {
+            background: rgba(255, 255, 255, 0.35);
+            transform: scale(0.95);
+        }
+
+        .transparent-btn.attack {
+            background: rgba(255, 107, 107, 0.25);
+            border-color: rgba(255, 107, 107, 0.5);
+        }
+
+        .transparent-btn.attack:active {
+            background: rgba(255, 107, 107, 0.5);
+        }
+
+        .transparent-btn.jump {
+            background: rgba(107, 207, 127, 0.25);
+            border-color: rgba(107, 207, 127, 0.5);
+        }
+
+        .transparent-btn.jump:active {
+            background: rgba(107, 207, 127, 0.5);
+        }
+
+        .transparent-btn.move {
+            background: rgba(77, 171, 247, 0.25);
+            border-color: rgba(77, 171, 247, 0.5);
+        }
+
+        .transparent-btn.move:active {
+            background: rgba(77, 171, 247, 0.5);
+        }
+
+        /* 玩家标签 */
+        .player-label {
+            font-size: 0.75em;
+            opacity: 0.8;
+            text-align: center;
+            margin-bottom: 2px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .player-label.p1 { color: #ff6b6b; }
+        .player-label.p2 { color: #4dabf7; }
+
+        /* 侧边信息面板 */
+        .side-panel {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+        }
+
+        h1 {
+            font-size: 1.3em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .device-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 8px;
+            font-size: 0.7em;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .status-bar {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 5px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .player-status {
             background: rgba(0, 0, 0, 0.4);
-            padding: 10px;
-            border-radius: 10px;
+            padding: 8px;
+            border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .player-status h3 {
-            margin-bottom: 5px;
-            font-size: 0.9em;
+            margin-bottom: 4px;
+            font-size: 0.85em;
             display: flex;
             align-items: center;
             gap: 5px;
@@ -157,16 +297,16 @@ HTML_TEMPLATE = """
         .player2 h3 { color: #4dabf7; }
 
         .stat-row {
-            margin: 3px 0;
-            font-size: 0.85em;
+            margin: 2px 0;
+            font-size: 0.75em;
         }
 
         .health-bar, .stamina-bar {
-            height: 15px;
+            height: 12px;
             background: rgba(0, 0, 0, 0.5);
-            border-radius: 8px;
+            border-radius: 6px;
             overflow: hidden;
-            margin-top: 3px;
+            margin-top: 2px;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
@@ -174,87 +314,64 @@ HTML_TEMPLATE = """
             height: 100%;
             background: linear-gradient(90deg, #ff6b6b, #ff8787);
             transition: width 0.3s ease;
-            box-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
+            box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
         }
 
         .stamina-fill {
             height: 100%;
             background: linear-gradient(90deg, #4dabf7, #74c0fc);
             transition: width 0.3s ease;
-            box-shadow: 0 0 8px rgba(77, 171, 247, 0.5);
+            box-shadow: 0 0 6px rgba(77, 171, 247, 0.5);
+        }
+
+        .combo-indicator {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #ffd93d;
+            text-shadow: 0 0 8px rgba(255, 217, 61, 0.8);
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 4px;
         }
 
         .controls {
             background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .control-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .player-controls {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
+            padding: 8px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .player-controls h3 {
-            margin-bottom: 8px;
-            font-size: 0.95em;
-            font-weight: bold;
-        }
-
-        .key-list {
-            list-style: none;
-            font-size: 0.8em;
-            line-height: 1.8;
-        }
-
-        .key {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: bold;
-            margin-right: 4px;
-            min-width: 20px;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .buttons {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
         }
 
         button {
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: 0.75em;
             font-weight: bold;
             transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            flex: 1;
-            min-width: 100px;
+            white-space: nowrap;
         }
 
         button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
         }
 
         button:active {
@@ -267,11 +384,10 @@ HTML_TEMPLATE = """
 
         .instructions {
             background: rgba(255, 255, 255, 0.1);
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 0.85em;
-            line-height: 1.6;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.7em;
+            line-height: 1.5;
             border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
@@ -279,145 +395,38 @@ HTML_TEMPLATE = """
             color: #ffd93d;
         }
 
-        /* 虚拟按键 - 仅在移动端显示 */
-        .virtual-controls {
-            display: none;
-            margin-top: 10px;
-            gap: 10px;
-            flex-direction: column;
-        }
-
-        .virtual-controls.show {
-            display: flex;
-        }
-
-        .virtual-row {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            width: 100%;
-        }
-
-        .virtual-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            color: white;
-            padding: 15px;
+        /* 游戏结束遮罩 */
+        .game-over-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 20px;
             border-radius: 12px;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            touch-action: manipulation;
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 50px;
-            transition: all 0.1s;
-        }
-
-        .virtual-btn:active {
-            background: rgba(255, 255, 255, 0.4);
-            transform: scale(0.95);
-        }
-
-        .virtual-btn.attack {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            border-color: #ff6b6b;
-        }
-
-        .virtual-btn.jump {
-            background: linear-gradient(135deg, #6bcf7f, #48bb78);
-            border-color: #6bcf7f;
-        }
-
-        .virtual-btn.move {
-            background: linear-gradient(135deg, #4dabf7, #3b82f6);
-            border-color: #4dabf7;
-        }
-
-        .virtual-btn.special {
-            background: linear-gradient(135deg, #ffd93d, #ff6b6b);
-            border-color: #ffd93d;
-            color: #000;
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 12px 18px;
-            border-radius: 8px;
-            border-left: 4px solid #ffd93d;
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-            z-index: 1000;
-            max-width: 280px;
-            font-size: 0.9em;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        .combo-indicator {
             text-align: center;
+            display: none;
+            z-index: 100;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            min-width: 240px;
+            animation: popIn 0.3s ease-out;
+            pointer-events: auto;
+        }
+
+        .game-over-overlay.show {
+            display: block;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .winner-text {
+            font-size: 1.4em;
+            margin-bottom: 12px;
             font-weight: bold;
-            font-size: 1.1em;
-            color: #ffd93d;
-            text-shadow: 0 0 10px rgba(255, 217, 61, 0.8);
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: comboShake 0.3s ease;
-        }
-
-        @keyframes comboShake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .control-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .status-bar {
-                grid-template-columns: 1fr;
-            }
-
-            h1 {
-                font-size: 1.5em;
-            }
-
-            .container {
-                padding: 10px;
-            }
-
-            .game-over-overlay {
-                padding: 20px;
-                min-width: 240px;
-            }
-
-            .winner-text {
-                font-size: 1.4em;
-            }
-
-            button {
-                padding: 8px 12px;
-                font-size: 0.85em;
-            }
-
-            .virtual-btn {
-                padding: 12px;
-                font-size: 1em;
-                min-height: 45px;
-            }
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
 
         /* 模式指示器 */
@@ -426,11 +435,12 @@ HTML_TEMPLATE = """
             top: 10px;
             left: 10px;
             background: rgba(0, 0, 0, 0.7);
-            padding: 6px 12px;
+            padding: 4px 8px;
             border-radius: 6px;
-            font-size: 0.8em;
+            font-size: 0.7em;
             font-weight: bold;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 5;
         }
 
         .mode-indicator.ai {
@@ -442,25 +452,151 @@ HTML_TEMPLATE = """
             border-color: #ff6b6b;
             color: #ff6b6b;
         }
+
+        /* 通知 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffd93d;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            max-width: 250px;
+            font-size: 0.85em;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        /* 横屏适配 */
+        @media (orientation: landscape) and (max-width: 1024px) {
+            .side-panel {
+                width: 220px;
+            }
+
+            h1 {
+                font-size: 1.1em;
+            }
+
+            .transparent-btn {
+                padding: 10px 12px;
+                font-size: 1em;
+                min-width: 45px;
+            }
+        }
+
+        /* 竖屏优化 */
+        @media (orientation: portrait) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .side-panel {
+                width: 100%;
+                max-height: 30vh;
+            }
+
+            .game-section {
+                max-width: 100%;
+                max-height: 60vh;
+            }
+        }
+
+        /* 小屏幕优化 */
+        @media (max-width: 600px) {
+            .side-panel {
+                width: 100%;
+                max-height: 25vh;
+            }
+
+            .game-section {
+                max-width: 100%;
+                max-height: 60vh;
+            }
+
+            h1 {
+                font-size: 1em;
+            }
+
+            .buttons {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                font-size: 0.7em;
+                padding: 6px 8px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔥 火柴人对战 - 创意增强版 🔥</h1>
-            <span class="device-badge" id="deviceBadge">检测中...</span>
-        </div>
+    <!-- 横屏提示 -->
+    <div id="portraitWarning" class="portrait-warning">
+        <div class="icon">📱</div>
+        <h2>请旋转设备</h2>
+        <p>为了获得最佳游戏体验</p>
+        <p>请将设备切换到横屏模式</p>
+    </div>
 
-        <div class="game-area">
-            <div class="canvas-container">
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 游戏区域 -->
+        <div class="game-section">
+            <div class="canvas-wrapper">
                 <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+                <!-- 透明虚拟按键 - 覆盖在画面上方 -->
+                <div id="transparentVirtualControls" class="transparent-virtual-controls">
+                    <div class="control-overlay-top">
+                        <!-- 玩家1 按键 -->
+                        <div class="player-label p1">🔴 玩家1</div>
+                        <div class="control-row">
+                            <div class="transparent-btn move" data-key="a">←</div>
+                            <div class="transparent-btn jump" data-key="w">↑</div>
+                            <div class="transparent-btn move" data-key="d">→</div>
+                        </div>
+                        <div class="control-row">
+                            <div class="transparent-btn attack" data-key="f">👊</div>
+                            <div class="transparent-btn attack" data-key="g">🦶</div>
+                        </div>
+
+                        <!-- 玩家2 按键 -->
+                        <div class="player-label p2" style="margin-top: 8px;">🔵 玩家2</div>
+                        <div class="control-row">
+                            <div class="transparent-btn move" data-key="ArrowLeft">←</div>
+                            <div class="transparent-btn jump" data-key="ArrowUp">↑</div>
+                            <div class="transparent-btn move" data-key="ArrowRight">→</div>
+                        </div>
+                        <div class="control-row">
+                            <div class="transparent-btn attack" data-key="j">👊</div>
+                            <div class="transparent-btn attack" data-key="k">🦶</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 游戏结束遮罩 -->
                 <div id="gameOverOverlay" class="game-over-overlay">
                     <div class="winner-text" id="winnerText"></div>
                     <div style="margin-top: 15px;">
                         <button onclick="resetGame()">🔄 再战一局</button>
                     </div>
                 </div>
+
+                <!-- 模式指示器 -->
                 <div id="modeIndicator" class="mode-indicator" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- 侧边信息面板 -->
+        <div class="side-panel">
+            <div class="header">
+                <h1>🔥 火柴人对战</h1>
+                <span class="device-badge" id="deviceBadge">检测中...</span>
             </div>
 
             <div class="status-bar">
@@ -492,23 +628,6 @@ HTML_TEMPLATE = """
             <div class="combo-indicator" id="comboIndicator"></div>
 
             <div class="controls">
-                <div class="control-grid">
-                    <div class="player-controls player1">
-                        <h3>玩家1 控制</h3>
-                        <ul class="key-list">
-                            <li><span class="key">W</span> 跳跃 <span class="key">A/D</span> 移动</li>
-                            <li><span class="key">F</span> 出拳 <span class="key">G</span> 踢腿</li>
-                        </ul>
-                    </div>
-                    <div class="player-controls player2">
-                        <h3>玩家2 控制</h3>
-                        <ul class="key-list">
-                            <li><span class="key">↑</span> 跳跃 <span class="key">←/→</span> 移动</li>
-                            <li><span class="key">J</span> 出拳 <span class="key">K</span> 踢腿</li>
-                        </ul>
-                    </div>
-                </div>
-
                 <div class="buttons">
                     <button onclick="resetGame()">🔄 重新开始</button>
                     <button onclick="togglePause()">⏸️ 暂停</button>
@@ -516,42 +635,15 @@ HTML_TEMPLATE = """
                     <button class="danger" onclick="toggleHardcore()" id="hardcoreBtn">💀 硬核</button>
                 </div>
 
-                <!-- 虚拟按键 - 手机端显示 -->
-                <div id="virtualControls" class="virtual-controls">
-                    <div style="text-align: center; margin-bottom: 5px; font-size: 0.9em; opacity: 0.8;">
-                        📱 虚拟按键模式
-                    </div>
-                    <!-- 玩家1 虚拟按键 -->
-                    <div style="font-size: 0.85em; opacity: 0.9; margin-top: 5px;">玩家1 (红色)</div>
-                    <div class="virtual-row">
-                        <div class="virtual-btn move" data-key="a">←</div>
-                        <div class="virtual-btn jump" data-key="w">↑</div>
-                        <div class="virtual-btn move" data-key="d">→</div>
-                    </div>
-                    <div class="virtual-row">
-                        <div class="virtual-btn attack" data-key="f">👊</div>
-                        <div class="virtual-btn attack" data-key="g">🦶</div>
-                    </div>
-
-                    <!-- 玩家2 虚拟按键 -->
-                    <div style="font-size: 0.85em; opacity: 0.9; margin-top: 10px;">玩家2 (蓝色)</div>
-                    <div class="virtual-row">
-                        <div class="virtual-btn move" data-key="ArrowLeft">←</div>
-                        <div class="virtual-btn jump" data-key="ArrowUp">↑</div>
-                        <div class="virtual-btn move" data-key="ArrowRight">→</div>
-                    </div>
-                    <div class="virtual-row">
-                        <div class="virtual-btn attack" data-key="j">👊</div>
-                        <div class="virtual-btn attack" data-key="k">🦶</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="instructions">
-                <strong>🎯 游戏说明：</strong> 将对手的生命值降至0即可获胜！
-                <div style="margin-top: 5px; opacity: 0.9;">
-                    💡 <strong>技巧：</strong> 连续攻击可累积连击！体力会自动恢复。
-                    硬核模式下伤害翻倍，体力恢复减半！
+                <div class="instructions">
+                    <strong>🎯 游戏说明：</strong><br>
+                    将对手生命降至0获胜！
+                    <br><br>
+                    <strong>💡 技巧：</strong><br>
+                    连续攻击累积连击，伤害最高2倍！
+                    <br><br>
+                    <strong>📱 手机端：</strong><br>
+                    虚拟按键透明显示在画面上方
                 </div>
             </div>
         </div>
@@ -566,13 +658,30 @@ HTML_TEMPLATE = """
 
         // 适配移动端画布大小
         function resizeCanvas() {
-            const container = canvas.parentElement;
-            const containerWidth = container.clientWidth - 10;
-            const maxWidth = 800;
-            const scale = Math.min(1, containerWidth / maxWidth);
-            canvas.style.width = (800 * scale) + 'px';
-            canvas.style.height = (500 * scale) + 'px';
+            const wrapper = canvas.parentElement;
+            const wrapperWidth = wrapper.clientWidth;
+            const wrapperHeight = wrapper.clientHeight;
+
+            const originalWidth = 800;
+            const originalHeight = 500;
+            const aspectRatio = originalWidth / originalHeight;
+
+            let newWidth, newHeight;
+
+            if (wrapperWidth / wrapperHeight > aspectRatio) {
+                // 容器更宽，以高度为准
+                newHeight = wrapperHeight * 0.95;
+                newWidth = newHeight * aspectRatio;
+            } else {
+                // 容器更高，以宽度为准
+                newWidth = wrapperWidth * 0.95;
+                newHeight = newWidth / aspectRatio;
+            }
+
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
         }
+
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
@@ -1127,7 +1236,7 @@ HTML_TEMPLATE = """
             const winnerColor = gameState.winner === 1 ? '#ff6b6b' : '#4dabf7';
             const winnerName = gameState.winner === 1 ? '玩家1' : '玩家2';
 
-            winnerText.innerHTML = `🎉 <span style="color: ${winnerColor}">${winnerName}</span> 获胜！🎉`;
+            winnerText.innerHTML = `🎉 <span style=\"color: ${winnerColor}\">${winnerName}</span> 获胜！🎉`;
             overlay.classList.add('show');
         }
 
@@ -1215,28 +1324,44 @@ HTML_TEMPLATE = """
             }
         }
 
-        // 设备检测
+        // 设备检测和横屏检测
         function detectDevice() {
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
             gameState.isMobile = isMobile;
 
             const badge = document.getElementById('deviceBadge');
-            const virtualControls = document.getElementById('virtualControls');
+            const virtualControls = document.getElementById('transparentVirtualControls');
+            const portraitWarning = document.getElementById('portraitWarning');
 
             if (isMobile) {
                 badge.textContent = '📱 手机端';
                 badge.style.background = 'linear-gradient(45deg, #ff6b6b, #ff8e53)';
                 virtualControls.classList.add('show');
-                showNotification('📱 检测到手机端，已启用虚拟按键！', 2000);
+                showNotification('📱 检测到手机端，已启用透明虚拟按键！', 2000);
+
+                // 检查横屏
+                checkOrientation();
             } else {
                 badge.textContent = '💻 电脑端';
                 badge.style.background = 'linear-gradient(45deg, #4dabf7, #74c0fc)';
             }
         }
 
+        // 横屏检测
+        function checkOrientation() {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const portraitWarning = document.getElementById('portraitWarning');
+
+            if (!isLandscape && gameState.isMobile) {
+                portraitWarning.classList.add('show');
+            } else {
+                portraitWarning.classList.remove('show');
+            }
+        }
+
         // 虚拟按键处理
         function setupVirtualControls() {
-            const buttons = document.querySelectorAll('.virtual-btn');
+            const buttons = document.querySelectorAll('.transparent-btn');
 
             buttons.forEach(btn => {
                 // 触摸事件
@@ -1244,7 +1369,7 @@ HTML_TEMPLATE = """
                     e.preventDefault();
                     const key = btn.dataset.key;
                     keys[key] = true;
-                    initAudio(); // 用户交互时初始化音频
+                    initAudio();
                 });
 
                 btn.addEventListener('touchend', (e) => {
@@ -1278,7 +1403,7 @@ HTML_TEMPLATE = """
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             keys[e.key] = true;
-            initAudio(); // 用户交互时初始化音频
+            initAudio();
 
             // 防止方向键滚动页面
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -1293,6 +1418,14 @@ HTML_TEMPLATE = """
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
             keys[e.key] = false;
+        });
+
+        // 窗口大小改变时检测横屏
+        window.addEventListener('resize', () => {
+            if (gameState.isMobile) {
+                checkOrientation();
+            }
+            resizeCanvas();
         });
 
         // 初始化
@@ -1316,73 +1449,40 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-enhanced",
-        "version": "2.0",
-        "features": ["mobile_support", "virtual_controls", "combo_system", "ai_mode", "hardcore_mode", "sound_effects"]
+        "service": "stickman-fighter-landscape",
+        "version": "3.0",
+        "features": ["landscape_mode", "transparent_controls", "mobile_optimized", "virtual_buttons_on_canvas"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter Enhanced",
-        "version": "2.0",
-        "description": "火柴人对战游戏 - 创意增强版",
+        "game": "Stickman Fighter Landscape Edition",
+        "version": "3.0",
+        "description": "火柴人对战游戏 - 横屏移动优化版",
         "features": [
-            "双人对战",
-            "手机端支持",
-            "虚拟按键",
+            "横屏模式优化",
+            "透明虚拟按键覆盖在画面上方",
+            "手机端专用布局",
+            "自动横屏检测",
             "连击系统",
             "AI对战模式",
-            "硬核模式",
-            "音效系统",
-            "增强图形"
+            "硬核模式"
         ]
-    })
-
-@app.route('/api/help')
-def help():
-    return jsonify({
-        "controls": {
-            "player1": {
-                "move": "W/A/D",
-                "attack": "F=拳, G=踢腿"
-            },
-            "player2": {
-                "move": "↑/←/→",
-                "attack": "J=拳, K=踢腿"
-            },
-            "global": {
-                "pause": "ESC",
-                "reset": "R",
-                "toggle_ai": "点击AI按钮",
-                "toggle_hardcore": "点击硬核按钮"
-            }
-        },
-        "mobile": {
-            "virtual_controls": "自动显示在手机端",
-            "touch": "点击虚拟按钮进行操作"
-        },
-        "game_mechanics": {
-            "punch": "8伤害, 消耗10体力",
-            "kick": "12伤害, 消耗15体力",
-            "combo": "连续攻击提升伤害(最高2倍)",
-            "hardcore": "伤害翻倍, 体力恢复减半"
-        }
     })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - 创意增强版")
+    print("🔥 火柴人对战 - 横屏移动优化版")
     print("=" * 60)
     print("🎮 特性:")
-    print("  ✅ 手机端支持 + 虚拟按键")
-    print("  ✅ 连击系统")
-    print("  ✅ AI对战模式")
-    print("  ✅ 硬核模式")
-    print("  ✅ 音效系统")
-    print("  ✅ 增强图形")
+    print("  ✅ 横屏模式优化")
+    print("  ✅ 透明虚拟按键（覆盖在画面上方）")
+    print("  ✅ 手机端专用布局")
+    print("  ✅ 自动横屏检测提示")
+    print("  ✅ 连击系统 + AI对战 + 硬核模式")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
     print("=" * 60)
