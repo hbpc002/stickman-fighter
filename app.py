@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2.3
-修复版：玩家2按钮响应 + 游戏结束重置功能
+🔥 火柴人对战游戏 - 横屏移动优化版 V2.4
+优化版：增大按钮、修复重置、更好操作体验
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -92,34 +92,36 @@ HTML_TEMPLATE = """
 
         /* 左侧控制面板 - 玩家1 */
         .control-panel-left {
-            width: 70px;
-            height: calc(100% - 40px);
+            width: 85px;
+            height: calc(100% - 45px);
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             align-items: center;
             justify-content: center;
-            padding: 8px 4px;
-            background: rgba(255, 107, 107, 0.2);
-            border-radius: 8px;
-            backdrop-filter: blur(5px);
-            margin-top: 20px;
+            padding: 10px 6px;
+            background: rgba(255, 107, 107, 0.25);
+            border-radius: 10px;
+            backdrop-filter: blur(6px);
+            margin-top: 25px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
         }
 
         /* 右侧控制面板 - 玩家2 */
         .control-panel-right {
-            width: 70px;
-            height: calc(100% - 40px);
+            width: 85px;
+            height: calc(100% - 45px);
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             align-items: center;
             justify-content: center;
-            padding: 8px 4px;
-            background: rgba(77, 171, 247, 0.2);
-            border-radius: 8px;
-            backdrop-filter: blur(5px);
-            margin-top: 20px;
+            padding: 10px 6px;
+            background: rgba(77, 171, 247, 0.25);
+            border-radius: 10px;
+            backdrop-filter: blur(6px);
+            margin-top: 25px;
+            border: 1px solid rgba(77, 171, 247, 0.3);
         }
 
         /* 游戏区域 */
@@ -129,10 +131,10 @@ HTML_TEMPLATE = """
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: calc(100% - 40px);
+            height: calc(100% - 45px);
             position: relative;
-            max-width: calc(100vw - 180px);
-            margin-top: 20px;
+            max-width: calc(100vw - 210px);
+            margin-top: 25px;
         }
 
         /* 画布容器 */
@@ -158,12 +160,12 @@ HTML_TEMPLATE = """
         /* 控制按钮样式 */
         .btn {
             width: 100%;
-            min-height: 40px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.4);
+            min-height: 48px;
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.5);
             color: white;
-            border-radius: 6px;
-            font-size: 1.1em;
+            border-radius: 8px;
+            font-size: 1.2em;
             font-weight: bold;
             cursor: pointer;
             user-select: none;
@@ -173,12 +175,14 @@ HTML_TEMPLATE = """
             justify-content: center;
             transition: all 0.1s;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            padding: 2px;
+            padding: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
         .btn:active {
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.5);
             transform: scale(0.95);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .btn.move {
@@ -187,14 +191,15 @@ HTML_TEMPLATE = """
         }
 
         .btn.jump {
-            background: rgba(107, 207, 127, 0.3);
-            border-color: rgba(107, 207, 127, 0.6);
+            background: rgba(107, 207, 127, 0.35);
+            border-color: rgba(107, 207, 127, 0.7);
             font-size: 1.4em;
+            min-height: 52px;
         }
 
         .btn.attack {
-            background: rgba(255, 107, 107, 0.3);
-            border-color: rgba(255, 107, 107, 0.6);
+            background: rgba(255, 107, 107, 0.35);
+            border-color: rgba(255, 107, 107, 0.7);
         }
 
         /* 玩家标签 */
@@ -331,6 +336,27 @@ HTML_TEMPLATE = """
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
 
+        /* 重置按钮 */
+        .reset-btn {
+            width: auto;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #6bcf7f, #48bb78);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+
+        .reset-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
         /* 模式指示器 */
         .mode-indicator {
             position: absolute;
@@ -437,16 +463,20 @@ HTML_TEMPLATE = """
         @media (max-width: 768px) {
             .control-panel-left,
             .control-panel-right {
-                width: 60px;
+                width: 70px;
+                gap: 5px;
+                padding: 8px 4px;
             }
 
             .btn {
-                min-height: 40px;
-                font-size: 1em;
+                min-height: 44px;
+                font-size: 1.1em;
+                padding: 3px;
             }
 
             .btn.jump {
-                font-size: 1.2em;
+                font-size: 1.3em;
+                min-height: 48px;
             }
 
             .player-label {
@@ -455,13 +485,13 @@ HTML_TEMPLATE = """
             }
 
             .status-bar-top {
-                gap: 5px;
+                gap: 4px;
             }
 
             .player-status-mini {
-                padding: 4px 6px;
-                min-width: 90px;
-                font-size: 0.75em;
+                padding: 3px 5px;
+                min-width: 80px;
+                font-size: 0.7em;
             }
 
             .bottom-controls {
@@ -476,6 +506,10 @@ HTML_TEMPLATE = """
                 font-size: 0.7em;
                 min-width: 40px;
                 height: 26px;
+            }
+
+            .game-area {
+                max-width: calc(100vw - 180px);
             }
         }
 
@@ -554,7 +588,7 @@ HTML_TEMPLATE = """
                 <div id="gameOverOverlay" class="game-over-overlay">
                     <div class="winner-text" id="winnerText"></div>
                     <div style="margin-top: 15px;">
-                        <button class="reset-btn" onclick="resetGame()" style="width: auto; padding: 10px 20px; background: linear-gradient(135deg, #6bcf7f, #48bb78); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">🔄 再战一局</button>
+                        <button id="resetButton" class="reset-btn">🔄 再战一局</button>
                     </div>
                 </div>
             </div>
@@ -1366,10 +1400,39 @@ HTML_TEMPLATE = """
             resizeCanvas();
         });
 
+        // 重置按钮事件监听器
+        function setupResetButton() {
+            const resetBtn = document.getElementById('resetButton');
+            if (resetBtn) {
+                // 触摸事件
+                resetBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    resetGame();
+                });
+
+                // 鼠标点击事件
+                resetBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    resetGame();
+                });
+
+                // 鼠标按下效果
+                resetBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            }
+        }
+
         // 初始化
         window.addEventListener('load', () => {
             detectDevice();
             setupVirtualControls();
+            setupResetButton();
             resetGame();
             resizeCanvas();
             gameLoop();
@@ -1388,24 +1451,24 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-v2.3",
-        "version": "3.4",
-        "features": ["landscape_mode", "side_controls", "fullscreen", "compact_bottom_bar", "maximized_canvas", "player2_fixed", "reset_fixed"]
+        "service": "stickman-fighter-v2.4",
+        "version": "3.5",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "larger_buttons", "better_usability", "player2_fixed", "reset_fixed"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter V2.3",
-        "version": "3.4",
-        "description": "火柴人对战游戏 - 完整修复版",
+        "game": "Stickman Fighter V2.4",
+        "version": "3.5",
+        "description": "火柴人对战游戏 - 操作优化版",
         "features": [
-            "两侧控制按钮",
+            "✅ 增大侧边按钮（更好操作）",
+            "✅ 修复玩家2按钮响应",
+            "✅ 修复游戏结束重置",
             "最大化游戏画面",
             "紧凑底部栏（不遮挡）",
             "全屏模式按钮",
-            "✅ 修复玩家2按钮响应",
-            "✅ 修复游戏结束重置",
             "顶部状态栏"
         ]
     })
@@ -1414,12 +1477,13 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
     print("=" * 60)
-    print("🔥 火柴人对战 - V2.3 完整修复版")
+    print("🔥 火柴人对战 - V2.4 操作优化版")
     print("=" * 60)
-    print("✅ 修复内容:")
-    print("  ✅ 玩家2按钮响应修复（update方法添加handleInput）")
-    print("  ✅ 游戏结束重置按钮修复（独立class避免冲突）")
-    print("  ✅ 虚拟按键同时设置大小写兼容")
+    print("✅ 优化内容:")
+    print("  ✅ 侧边按钮增大（85px宽，48-52px高）")
+    print("  ✅ 按钮更醒目（更亮的颜色，阴影效果）")
+    print("  ✅ 重置按钮独立事件监听器")
+    print("  ✅ 玩家2按钮响应修复")
     print("=" * 60)
     print(f"📱 访问: http://localhost:{port}")
     print("=" * 60)
