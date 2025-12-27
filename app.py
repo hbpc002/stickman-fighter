@@ -1484,13 +1484,15 @@ HTML_TEMPLATE = """
         }
 
         function gameLoop() {
+            // 总是绘制游戏，即使在暂停或游戏结束状态
+            drawGame();
+
             if (gameState.paused) {
                 requestAnimationFrame(gameLoop);
                 return;
             }
 
             if (gameState.gameOver) {
-                drawGame();
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -1586,19 +1588,35 @@ HTML_TEMPLATE = """
                 playSound('win');
             }
 
-            drawGame();
             updateUI();
 
             requestAnimationFrame(gameLoop);
         }
 
         function drawGame() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制背景
             drawBackground();
+
             // 绘制掉落的武器
-            gameState.weapons.forEach(weapon => weapon.draw());
+            if (gameState.weapons) {
+                gameState.weapons.forEach(weapon => weapon.draw());
+            }
+
             // 绘制玩家
-            if (gameState.player1) gameState.player1.draw();
-            if (gameState.player2) gameState.player2.draw();
+            if (gameState.player1) {
+                gameState.player1.draw();
+            } else {
+                console.log('⚠️ player1 未初始化');
+            }
+
+            if (gameState.player2) {
+                gameState.player2.draw();
+            } else {
+                console.log('⚠️ player2 未初始化');
+            }
         }
 
         function showGameOver() {
@@ -1715,30 +1733,35 @@ HTML_TEMPLATE = """
 
         // 全屏功能
         function toggleFullscreen() {
-            const elem = document.documentElement;
+            try {
+                const elem = document.documentElement;
 
-            if (!document.fullscreenElement) {
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen();
-                } else if (elem.webkitRequestFullscreen) {
-                    elem.webkitRequestFullscreen();
-                } else if (elem.mozRequestFullScreen) {
-                    elem.mozRequestFullScreen();
-                } else if (elem.msRequestFullscreen) {
-                    elem.msRequestFullscreen();
+                if (!document.fullscreenElement) {
+                    if (elem.requestFullscreen) {
+                        elem.requestFullscreen();
+                    } else if (elem.webkitRequestFullscreen) {
+                        elem.webkitRequestFullscreen();
+                    } else if (elem.mozRequestFullScreen) {
+                        elem.mozRequestFullScreen();
+                    } else if (elem.msRequestFullscreen) {
+                        elem.msRequestFullscreen();
+                    }
+                    showNotification('🖥️ 进入全屏模式', 1000);
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                    showNotification('🖥️ 退出全屏模式', 1000);
                 }
-                showNotification('🖥️ 进入全屏模式', 1000);
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
-                } else if (document.mozCancelFullScreen) {
-                    document.mozCancelFullScreen();
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
-                }
-                showNotification('🖥️ 退出全屏模式', 1000);
+            } catch(e) {
+                showNotification('⚠️ 全屏功能需要用户交互', 1500);
+                console.log('Fullscreen error:', e);
             }
         }
 
@@ -1889,13 +1912,27 @@ HTML_TEMPLATE = """
 
         // 初始化
         window.addEventListener('load', () => {
+            console.log('🎮 游戏初始化开始...');
+
             detectDevice();
             setupVirtualControls();
             setupResetButton();
             resetGame();
             resizeCanvas();
+
+            // 检查canvas是否准备好
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas && canvas.getContext) {
+                console.log('✅ Canvas准备就绪');
+                console.log('Canvas尺寸:', canvas.width, 'x', canvas.height);
+                console.log('Canvas样式尺寸:', canvas.style.width, canvas.style.height);
+            } else {
+                console.log('❌ Canvas未找到或不支持');
+            }
+
             gameLoop();
             showNotification('🎮 游戏加载完成！按 R 重新开始', 2000);
+            console.log('🎉 游戏初始化完成');
         });
     </script>
 </body>
