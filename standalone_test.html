@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火柴人游戏 - 独立测试版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #debug {
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        #gameArea {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        canvas {
+            border: 3px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .controls {
+            margin-top: 10px;
+            text-align: center;
+            color: white;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="debug">初始化中...</div>
+
+    <div id="gameArea">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+        <div>玩家1: WASD移动, F出拳, G踢腿 | 玩家2: 方向键移动, J出拳, K踢腿</div>
+        <button onclick="resetGame()">🔄 重置游戏</button>
+        <button onclick="togglePause()">⏸️ 暂停</button>
+        <button onclick="testFullscreen()">🖥️ 测试全屏</button>
+    </div>
+
+    <script>
+        const debug = document.getElementById('debug');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = {
+            paused: false,
+            gameOver: false,
+            player1: null,
+            player2: null,
+            weapons: []
+        };
+
+        const keys = {};
+
+        function log(msg) {
+            debug.innerHTML += `<div>${msg}</div>`;
+            debug.scrollTop = debug.scrollHeight;
+            console.log(msg);
+        }
+
+        // 简化版玩家类
+        class SimplePlayer {
+            constructor(x, y, color, controls, num) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.controls = controls;
+                this.num = num;
+                this.vx = 0;
+                this.vy = 0;
+                this.width = 30;
+                this.height = 60;
+                this.health = 100;
+                this.onGround = false;
+                log(`✅ 玩家${num} 初始化完成`);
+            }
+
+            update() {
+                if (gameState.paused || gameState.gameOver) return;
+
+                this.vx = 0;
+                if (keys[this.controls.left]) this.vx = -4;
+                if (keys[this.controls.right]) this.vx = 4;
+                if (keys[this.controls.jump] && this.onGround) {
+                    this.vy = -12;
+                    this.onGround = false;
+                }
+
+                this.vy += 0.6; // 重力
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 地面碰撞
+                const ground = canvas.height - 80;
+                if (this.y + this.height >= ground) {
+                    this.y = ground - this.height;
+                    this.vy = 0;
+                    this.onGround = true;
+                }
+
+                // 边界
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+            }
+
+            draw() {
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+
+                const cx = this.x + this.width / 2;
+                const cy = this.y + 15;
+
+                // 头
+                ctx.beginPath();
+                ctx.arc(cx, this.y + 8, 8, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 身体
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx, cy + 25);
+                ctx.stroke();
+
+                // 腿
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + 25);
+                ctx.lineTo(cx - 6, cy + 45);
+                ctx.moveTo(cx, cy + 25);
+                ctx.lineTo(cx + 6, cy + 45);
+                ctx.stroke();
+
+                // 手臂
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + 8);
+                ctx.lineTo(cx + 12, cy + 8);
+                ctx.moveTo(cx, cy + 8);
+                ctx.lineTo(cx - 8, cy + 10);
+                ctx.stroke();
+            }
+        }
+
+        function drawBackground() {
+            // 天空
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(1, '#B0E0E6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 太阳
+            ctx.beginPath();
+            ctx.arc(550, 60, 15, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFD700';
+            ctx.fill();
+            ctx.strokeStyle = '#FFA500';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 云朵
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            drawCloud(100, 70);
+            drawCloud(350, 50);
+            drawCloud(480, 80);
+
+            // 地面
+            const groundY = canvas.height - 80;
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(0, groundY, canvas.width, 80);
+
+            // 地面纹理
+            ctx.strokeStyle = '#4a3319';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < canvas.width; i += 12) {
+                ctx.beginPath();
+                ctx.moveTo(i, groundY);
+                ctx.lineTo(i, groundY + 10);
+                ctx.stroke();
+            }
+        }
+
+        function drawCloud(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.arc(x + 12, y - 5, 18, 0, Math.PI * 2);
+            ctx.arc(x + 24, y, 15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function gameLoop() {
+            // 总是绘制
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+
+            if (gameState.player1) {
+                gameState.player1.update();
+                gameState.player1.draw();
+            }
+
+            if (gameState.player2) {
+                gameState.player2.update();
+                gameState.player2.draw();
+            }
+
+            if (!gameState.gameOver && !gameState.paused) {
+                // 简单的碰撞检测
+                if (gameState.player1 && gameState.player2) {
+                    const dist = Math.abs(gameState.player1.x - gameState.player2.x);
+                    if (dist < 50) {
+                        // 简单的攻击逻辑
+                        if (keys['f']) {
+                            gameState.player2.health -= 1;
+                            log(`💥 玩家1攻击玩家2 - 剩余血量: ${gameState.player2.health}`);
+                        }
+                        if (keys['j']) {
+                            gameState.player1.health -= 1;
+                            log(`💥 玩家2攻击玩家1 - 剩余血量: ${gameState.player1.health}`);
+                        }
+                    }
+                }
+
+                // 检查游戏结束
+                if (gameState.player1 && gameState.player1.health <= 0) {
+                    gameState.gameOver = true;
+                    log('🎮 游戏结束 - 玩家2获胜！');
+                }
+                if (gameState.player2 && gameState.player2.health <= 0) {
+                    gameState.gameOver = true;
+                    log('🎮 游戏结束 - 玩家1获胜！');
+                }
+            }
+
+            // 显示状态
+            if (gameState.player1 && gameState.player2) {
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.fillText(`P1: ${gameState.player1.health} HP`, 10, 20);
+                ctx.fillText(`P2: ${gameState.player2.health} HP`, canvas.width - 100, 20);
+
+                if (gameState.paused) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '30px Arial';
+                    ctx.fillText('已暂停', canvas.width/2 - 50, canvas.height/2);
+                }
+
+                if (gameState.gameOver) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '30px Arial';
+                    ctx.fillText('游戏结束！', canvas.width/2 - 80, canvas.height/2);
+                    ctx.font = '16px Arial';
+                    ctx.fillText('点击"重置游戏"重新开始', canvas.width/2 - 120, canvas.height/2 + 40);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            gameState.player1 = new SimplePlayer(100, 200, '#ff6b6b', {
+                left: 'a', right: 'd', jump: 'w'
+            }, 1);
+
+            gameState.player2 = new SimplePlayer(450, 200, '#4dabf7', {
+                left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp'
+            }, 2);
+
+            gameState.gameOver = false;
+            gameState.paused = false;
+            log('🔄 游戏重置完成');
+        }
+
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            log(gameState.paused ? '⏸️ 暂停' : '▶️ 继续');
+        }
+
+        function testFullscreen() {
+            try {
+                const elem = document.documentElement;
+                if (!document.fullscreenElement) {
+                    elem.requestFullscreen();
+                    log('🖥️ 尝试进入全屏');
+                } else {
+                    document.exitFullscreen();
+                    log('🖥️ 退出全屏');
+                }
+            } catch(e) {
+                log('❌ 全屏失败: ' + e.message);
+            }
+        }
+
+        // 键盘事件
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === 'Escape') togglePause();
+            if (e.key === 'r' || e.key === 'R') resetGame();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // 初始化
+        window.addEventListener('load', () => {
+            log('🎮 独立测试版初始化...');
+            log('✅ Canvas支持: ' + (ctx ? '是' : '否'));
+            log('✅ Canvas尺寸: ' + canvas.width + 'x' + canvas.height);
+
+            resetGame();
+            gameLoop();
+
+            log('🎉 测试游戏已启动！');
+            log('💡 按 WASD 控制玩家1，方向键控制玩家2');
+            log('💡 按 F/J 攻击，按 R 重置');
+        });
+    </script>
+</body>
+</html>
