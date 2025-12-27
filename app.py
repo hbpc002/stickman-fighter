@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 火柴人对战游戏 - 横屏移动优化版 V2.5
-修复版：游戏循环持续运行，重置后立即恢复
+🔥 火柴人对战游戏 - V2.6 创意武器系统版
+新增：6种独特武器 + 特殊效果 + 自动掉落机制
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -17,7 +17,7 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🔥 火柴人对战 - 横屏版</title>
+    <title>🔥 火柴人对战 - 武器系统版 V2.6</title>
     <style>
         * {
             margin: 0;
@@ -303,6 +303,42 @@ HTML_TEMPLATE = """
             50% { transform: translateX(-50%) scale(1.1); }
         }
 
+        /* 武器状态指示器 */
+        .weapon-status {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 12px;
+            border-radius: 8px;
+            z-index: 5;
+            display: none;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+        }
+
+        .weapon-status.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .weapon-status .weapon-name {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .weapon-status .weapon-durability {
+            color: #ffd93d;
+            font-size: 0.85em;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
         /* 游戏结束遮罩 */
         .game-over-overlay {
             position: absolute;
@@ -450,9 +486,11 @@ HTML_TEMPLATE = """
             transform: translateX(400px);
             transition: transform 0.3s ease;
             z-index: 10000;
-            max-width: 250px;
+            max-width: 300px;
             font-size: 0.9em;
             backdrop-filter: blur(10px);
+            white-space: pre-wrap;
+            line-height: 1.4;
         }
 
         .notification.show {
@@ -577,6 +615,9 @@ HTML_TEMPLATE = """
             <!-- 连击指示器 -->
             <div class="combo-indicator" id="comboIndicator"></div>
 
+            <!-- 武器状态指示器 -->
+            <div class="weapon-status" id="weaponStatus"></div>
+
             <!-- 模式指示器 -->
             <div id="modeIndicator" class="mode-indicator" style="display: none;"></div>
 
@@ -620,6 +661,7 @@ HTML_TEMPLATE = """
         <button class="func-btn warning" onclick="toggleAI()" id="aiBtn">🤖 AI</button>
         <button class="func-btn danger" onclick="toggleHardcore()" id="hardcoreBtn">💀 硬核</button>
         <button class="func-btn" onclick="resetGame()">🔄 重置</button>
+        <button class="func-btn" onclick="showWeaponsInfo()">⚔️ 武器</button>
     </div>
 
     <div id="notification" class="notification"></div>
@@ -666,9 +708,11 @@ HTML_TEMPLATE = """
             aiEnabled: false,
             hardcoreMode: false,
             isMobile: false,
+            weapons: [], // 武器数组
+            weaponDropTimer: 0, // 武器掉落计时器
             stats: {
-                p1: { hits: 0, damage: 0, maxCombo: 0 },
-                p2: { hits: 0, damage: 0, maxCombo: 0 }
+                p1: { hits: 0, damage: 0, maxCombo: 0, weaponsCollected: 0 },
+                p2: { hits: 0, damage: 0, maxCombo: 0, weaponsCollected: 0 }
             }
         };
 
@@ -715,6 +759,21 @@ HTML_TEMPLATE = """
                         gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
                         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
                         break;
+                    case 'weapon_pickup':
+                        oscillator.frequency.value = 600;
+                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                        break;
+                    case 'weapon_drop':
+                        oscillator.frequency.value = 200;
+                        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+                        break;
+                    case 'weapon_special':
+                        oscillator.frequency.value = 800;
+                        gainNode.gain.setValueAtTime(0.18, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        break;
                 }
 
                 oscillator.start(audioContext.currentTime);
@@ -730,6 +789,96 @@ HTML_TEMPLATE = """
             setTimeout(() => {
                 notif.classList.remove('show');
             }, duration);
+        }
+
+        // 武器系统 - 创意武器类
+        class Weapon {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 20;
+                this.height = 20;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = -3; // 向上抛出
+                this.gravity = 0.3;
+                this.onGround = false;
+                this.lifetime = 300; // 存在时间（帧）
+
+                // 随机选择武器类型
+                const types = [
+                    { name: '火焰剑', emoji: '🔥', color: '#ff4500', damage: 15, special: 'burn', durability: 5 },
+                    { name: '闪电锤', emoji: '⚡', color: '#ffd700', damage: 20, special: 'knockback', durability: 4 },
+                    { name: '冰霜弓', emoji: '🧊', color: '#00bfff', damage: 12, special: 'slow', durability: 6 },
+                    { name: '钻石匕首', emoji: '💎', color: '#00ffff', damage: 25, special: 'crit', durability: 3 },
+                    { name: '战斧', emoji: '🪓', color: '#8b4513', damage: 22, special: 'stun', durability: 4 },
+                    { name: '回旋镖', emoji: '🎯', color: '#ff1493', damage: 18, special: 'boomerang', durability: 5 }
+                ];
+
+                const type = types[Math.floor(Math.random() * types.length)];
+                this.name = type.name;
+                this.emoji = type.emoji;
+                this.color = type.color;
+                this.baseDamage = type.damage;
+                this.special = type.special;
+                this.durability = type.durability;
+                this.maxDurability = type.durability;
+            }
+
+            update() {
+                if (!this.onGround) {
+                    this.vy += this.gravity;
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // 地面碰撞
+                    const groundLevel = canvas.height - 80;
+                    if (this.y + this.height >= groundLevel) {
+                        this.y = groundLevel - this.height;
+                        this.vy = 0;
+                        this.vx = 0;
+                        this.onGround = true;
+                    }
+
+                    // 边界限制
+                    if (this.x < 0) this.x = 0;
+                    if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+                }
+
+                this.lifetime--;
+            }
+
+            draw() {
+                // 绘制武器光效
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+
+                // 武器主体
+                ctx.fillStyle = this.color;
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.emoji, this.x + this.width/2, this.y + this.height/2);
+
+                // 耐久度指示器
+                if (this.durability > 0) {
+                    const barWidth = 20;
+                    const barHeight = 3;
+                    const durabilityRatio = this.durability / this.maxDurability;
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(this.x, this.y - 6, barWidth, barHeight);
+
+                    ctx.fillStyle = durabilityRatio > 0.5 ? '#00ff00' : durabilityRatio > 0.25 ? '#ffff00' : '#ff0000';
+                    ctx.fillRect(this.x, this.y - 6, barWidth * durabilityRatio, barHeight);
+                }
+
+                ctx.restore();
+            }
+
+            isExpired() {
+                return this.lifetime <= 0;
+            }
         }
 
         // 火柴人玩家类
@@ -763,17 +912,115 @@ HTML_TEMPLATE = """
                 this.comboMultiplier = 1;
 
                 this.animationTimer = 0;
+
+                // 武器系统
+                this.weapon = null; // 当前装备的武器
+                this.isUsingWeapon = false; // 是否正在使用武器
+                this.burnTicks = 0; // 燃烧效果计数
+                this.slowTicks = 0; // 减速效果计数
+                this.stunTicks = 0; // 眩晕效果计数
+            }
+
+            // 拾取武器
+            pickUpWeapon(weapon) {
+                this.weapon = weapon;
+                this.weapon.durability = weapon.durability; // 重置耐久
+                showNotification(`玩家${this.playerNum} 拾取了 ${weapon.name} ${weapon.emoji}`, 1200);
+                playSound('weapon_pickup');
+                gameState.stats[`p${this.playerNum}`].weaponsCollected++;
+            }
+
+            // 使用武器攻击
+            useWeapon() {
+                if (!this.weapon || this.weapon.durability <= 0) {
+                    this.weapon = null;
+                    return null;
+                }
+
+                if (this.stamina < 15) return null;
+
+                this.isUsingWeapon = true;
+                this.attackCooldown = 25;
+                this.stamina -= 15;
+                this.animationTimer = 0;
+                playSound('weapon_special');
+
+                // 武器耐久减少
+                this.weapon.durability--;
+
+                // 武器耗尽提示
+                if (this.weapon.durability <= 0) {
+                    showNotification(`${this.weapon.name} 耗尽!`, 800);
+                    this.weapon = null;
+                }
+
+                return this.weapon;
+            }
+
+            // 应用特殊效果
+            applySpecialEffect(special) {
+                switch(special) {
+                    case 'burn':
+                        this.burnTicks = 60; // 持续2秒
+                        break;
+                    case 'slow':
+                        this.slowTicks = 90; // 持续3秒
+                        break;
+                    case 'stun':
+                        this.stunTicks = 40; // 持续1.3秒
+                        break;
+                    case 'knockback':
+                        // 击退在伤害计算时处理
+                        break;
+                    case 'crit':
+                        // 暴击在伤害计算时处理
+                        break;
+                }
+            }
+
+            // 处理特殊效果
+            handleSpecialEffects() {
+                // 燃烧伤害
+                if (this.burnTicks > 0) {
+                    if (this.burnTicks % 20 === 0) { // 每0.67秒造成1点伤害
+                        this.health -= 1;
+                        if (this.health < 0) this.health = 0;
+                    }
+                    this.burnTicks--;
+                }
+
+                // 减速
+                if (this.slowTicks > 0) {
+                    this.slowTicks--;
+                }
+
+                // 眩晕
+                if (this.stunTicks > 0) {
+                    this.stunTicks--;
+                    return true; // 眩晕中，无法行动
+                }
+
+                return false;
             }
 
             handleInput() {
+                // 眩晕检查
+                if (this.handleSpecialEffects()) {
+                    this.vx = 0;
+                    return;
+                }
+
                 this.vx = 0;
 
+                // 减速效果
+                let speedMultiplier = this.slowTicks > 0 ? 0.5 : 1;
+
                 if (keys[this.controls.left]) {
-                    this.vx = -this.speed;
+                    this.vx = -this.speed * speedMultiplier;
                     this.facingRight = false;
                 }
                 if (keys[this.controls.right]) {
-                    this.vx = this.speed;
+                    this.vx = this.speed * speedMultiplier;
                     this.facingRight = true;
                 }
 
@@ -784,7 +1031,10 @@ HTML_TEMPLATE = """
                 }
 
                 if (this.attackCooldown === 0) {
-                    if (keys[this.controls.punch]) {
+                    // 优先使用武器攻击（如果装备了武器）
+                    if (this.weapon && keys[this.controls.punch]) {
+                        this.useWeapon();
+                    } else if (keys[this.controls.punch]) {
                         this.punch();
                     } else if (keys[this.controls.kick]) {
                         this.kick();
@@ -793,30 +1043,39 @@ HTML_TEMPLATE = """
             }
 
             aiControl(target) {
+                // 眩晕检查
+                if (this.handleSpecialEffects()) {
+                    this.vx = 0;
+                    return;
+                }
+
                 if (this.attackCooldown > 0) return;
 
                 const distance = Math.abs(this.x - target.x);
                 const isTargetLeft = target.x < this.x;
 
+                // 减速效果
+                let speedMultiplier = this.slowTicks > 0 ? 0.5 : 1;
+
                 if (distance > 80) {
                     if (isTargetLeft) {
-                        this.vx = -this.speed;
+                        this.vx = -this.speed * speedMultiplier;
                         this.facingRight = false;
                     } else {
-                        this.vx = this.speed;
+                        this.vx = this.speed * speedMultiplier;
                         this.facingRight = true;
                     }
                 } else if (distance < 40) {
                     if (isTargetLeft) {
-                        this.vx = this.speed;
+                        this.vx = this.speed * speedMultiplier;
                         this.facingRight = true;
                     } else {
-                        this.vx = -this.speed;
+                        this.vx = -this.speed * speedMultiplier;
                         this.facingRight = false;
                     }
                 }
 
-                if (target.isPunching || target.isKicking) {
+                if (target.isPunching || target.isKicking || target.isUsingWeapon) {
                     if (this.onGround && Math.random() > 0.7) {
                         this.vy = -this.jumpPower;
                         this.onGround = false;
@@ -824,7 +1083,10 @@ HTML_TEMPLATE = """
                 }
 
                 if (distance < 70 && this.stamina > 20) {
-                    if (Math.random() > 0.5) {
+                    // AI优先使用武器
+                    if (this.weapon && Math.random() > 0.3) {
+                        this.useWeapon();
+                    } else if (Math.random() > 0.5) {
                         this.punch();
                     } else {
                         this.kick();
@@ -852,9 +1114,28 @@ HTML_TEMPLATE = """
                 }
             }
 
-            takeDamage(damage, attacker = null) {
+            takeDamage(damage, attacker = null, weapon = null) {
                 if (this.hitCooldown === 0) {
-                    const finalDamage = gameState.hardcoreMode ? damage * 2 : damage;
+                    let finalDamage = gameState.hardcoreMode ? damage * 2 : damage;
+
+                    // 武器特殊效果处理
+                    if (weapon) {
+                        // 暴击效果
+                        if (weapon.special === 'crit' && Math.random() > 0.7) {
+                            finalDamage = Math.floor(finalDamage * 2);
+                            showNotification(`💥 暴击! ${finalDamage} 伤害`, 600);
+                        }
+
+                        // 应用特殊效果
+                        this.applySpecialEffect(weapon.special);
+
+                        // 击退效果
+                        if (weapon.special === 'knockback' && attacker) {
+                            const knockback = attacker.facingRight ? 8 : -8;
+                            this.vx = knockback;
+                        }
+                    }
+
                     this.health -= finalDamage;
                     this.hitCooldown = 30;
 
@@ -901,6 +1182,12 @@ HTML_TEMPLATE = """
                     return this.facingRight
                         ? { x: this.x + this.width, y: this.y + 30, w: reach, h: 40 }
                         : { x: this.x - reach, y: this.y + 30, w: reach, h: 40 };
+                } else if (this.isUsingWeapon) {
+                    // 武器攻击范围更大
+                    const reach = 60;
+                    return this.facingRight
+                        ? { x: this.x + this.width, y: this.y + 10, w: reach, h: 40 }
+                        : { x: this.x - reach, y: this.y + 10, w: reach, h: 40 };
                 }
                 return null;
             }
@@ -938,12 +1225,33 @@ HTML_TEMPLATE = """
                     }
                 }
 
-                if (this.isPunching || this.isKicking) {
+                // 处理武器动画
+                if (this.isPunching || this.isKicking || this.isUsingWeapon) {
                     this.animationTimer++;
                     if (this.animationTimer >= 10) {
                         this.isPunching = false;
                         this.isKicking = false;
+                        this.isUsingWeapon = false;
                         this.animationTimer = 0;
+                    }
+                }
+
+                // 武器拾取检测
+                if (!gameState.gameOver) {
+                    for (let i = gameState.weapons.length - 1; i >= 0; i--) {
+                        const weapon = gameState.weapons[i];
+                        if (weapon.onGround) {
+                            // 碰撞检测
+                            if (this.x < weapon.x + weapon.width &&
+                                this.x + this.width > weapon.x &&
+                                this.y < weapon.y + weapon.height &&
+                                this.y + this.height > weapon.y) {
+
+                                this.pickUpWeapon(weapon);
+                                gameState.weapons.splice(i, 1);
+                                break;
+                            }
+                        }
                     }
                 }
 
@@ -961,17 +1269,38 @@ HTML_TEMPLATE = """
                 const bodyX = this.x + this.width / 2;
                 const bodyY = this.y + 15;
 
-                ctx.strokeStyle = this.color;
+                // 特殊效果视觉提示
+                let drawColor = this.color;
+                let glowSize = 0;
+
+                if (this.burnTicks > 0) {
+                    drawColor = '#ff4500';
+                    glowSize = 8;
+                }
+                if (this.slowTicks > 0) {
+                    drawColor = '#00bfff';
+                    glowSize = 8;
+                }
+                if (this.stunTicks > 0) {
+                    drawColor = '#ffff00';
+                    glowSize = 10;
+                }
+                if (this.combo >= 5) {
+                    glowSize = Math.max(glowSize, 10);
+                }
+
+                ctx.strokeStyle = drawColor;
                 ctx.lineWidth = 3.5;
                 ctx.lineCap = 'round';
 
-                if (this.combo >= 5) {
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = this.color;
+                if (glowSize > 0) {
+                    ctx.shadowBlur = glowSize;
+                    ctx.shadowColor = drawColor;
                 } else {
                     ctx.shadowBlur = 0;
                 }
 
+                // 绘制火柴人
                 ctx.beginPath();
                 ctx.arc(bodyX, this.y + 8, 8, 0, Math.PI * 2);
                 ctx.stroke();
@@ -1006,11 +1335,12 @@ HTML_TEMPLATE = """
 
                 const armY = bodyY + 8;
                 const punchOffset = (this.isPunching && this.animationTimer < 5) ? 12 : 0;
+                const weaponOffset = (this.isUsingWeapon && this.animationTimer < 5) ? 15 : 0;
 
                 if (this.facingRight) {
                     ctx.beginPath();
                     ctx.moveTo(bodyX, armY);
-                    ctx.lineTo(bodyX + 12 + punchOffset, armY);
+                    ctx.lineTo(bodyX + 12 + punchOffset + weaponOffset, armY);
                     ctx.stroke();
 
                     ctx.beginPath();
@@ -1020,13 +1350,45 @@ HTML_TEMPLATE = """
                 } else {
                     ctx.beginPath();
                     ctx.moveTo(bodyX, armY);
-                    ctx.lineTo(bodyX - 12 - punchOffset, armY);
+                    ctx.lineTo(bodyX - 12 - punchOffset - weaponOffset, armY);
                     ctx.stroke();
 
                     ctx.beginPath();
                     ctx.moveTo(bodyX, armY);
                     ctx.lineTo(bodyX + 8, armY + 4);
                     ctx.stroke();
+                }
+
+                // 绘制装备的武器
+                if (this.weapon) {
+                    ctx.save();
+                    ctx.font = '16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = this.weapon.color;
+
+                    let weaponX = bodyX;
+                    let weaponY = bodyY + 8;
+
+                    if (this.isUsingWeapon && this.animationTimer < 5) {
+                        // 攻击时武器前伸
+                        if (this.facingRight) {
+                            weaponX += 18;
+                        } else {
+                            weaponX -= 18;
+                        }
+                    } else {
+                        // 非攻击时在身侧
+                        if (this.facingRight) {
+                            weaponX += 10;
+                        } else {
+                            weaponX -= 10;
+                        }
+                    }
+
+                    ctx.fillText(this.weapon.emoji, weaponX, weaponY);
+                    ctx.restore();
                 }
 
                 ctx.shadowBlur = 0;
@@ -1096,6 +1458,29 @@ HTML_TEMPLATE = """
             document.getElementById('p1StBar').style.width = p1.stamina + '%';
             document.getElementById('p2HpBar').style.width = p2.health + '%';
             document.getElementById('p2StBar').style.width = p2.stamina + '%';
+
+            // 更新武器状态显示
+            const weaponStatus = document.getElementById('weaponStatus');
+
+            // 检查两个玩家的武器
+            const weapons = [];
+            if (p1.weapon) weapons.push({ player: '玩家1', color: '#ff6b6b', weapon: p1.weapon });
+            if (p2.weapon) weapons.push({ player: '玩家2', color: '#4dabf7', weapon: p2.weapon });
+
+            if (weapons.length > 0) {
+                if (weapons.length === 1) {
+                    const w = weapons[0];
+                    weaponStatus.innerHTML = `<span class="weapon-name" style="color: ${w.color}">${w.player} ${w.weapon.emoji} ${w.weapon.name}</span><span class="weapon-durability">耐久: ${w.weapon.durability}/${w.weapon.maxDurability}</span>`;
+                } else {
+                    // 两个玩家都有武器，显示两个
+                    weaponStatus.innerHTML = weapons.map(w =>
+                        `<span style="color: ${w.color}">${w.player} ${w.weapon.emoji}</span>`
+                    ).join(' ');
+                }
+                weaponStatus.classList.add('show');
+            } else {
+                weaponStatus.classList.remove('show');
+            }
         }
 
         function gameLoop() {
@@ -1114,28 +1499,77 @@ HTML_TEMPLATE = """
             gameState.player1.update();
             gameState.player2.update();
 
+            // 武器掉落系统
+            gameState.weaponDropTimer++;
+            if (gameState.weaponDropTimer > 300 && Math.random() > 0.97) { // 每5-10秒随机掉落
+                const x = Math.random() * (canvas.width - 100) + 50;
+                const y = 100;
+                gameState.weapons.push(new Weapon(x, y));
+                gameState.weaponDropTimer = 0;
+                playSound('weapon_drop');
+                showNotification('✨ 武器掉落!', 800);
+            }
+
+            // 更新武器
+            for (let i = gameState.weapons.length - 1; i >= 0; i--) {
+                const weapon = gameState.weapons[i];
+                weapon.update();
+
+                if (weapon.isExpired()) {
+                    gameState.weapons.splice(i, 1);
+                }
+            }
+
+            // 玩家1攻击检测
             const hitbox1 = gameState.player1.getAttackHitbox();
             if (hitbox1) {
-                let damage = gameState.player1.isPunching ? 8 : 12;
+                let damage = 8;
+                let weapon = null;
+
+                if (gameState.player1.isPunching) {
+                    damage = 8;
+                } else if (gameState.player1.isKicking) {
+                    damage = 12;
+                } else if (gameState.player1.isUsingWeapon && gameState.player1.weapon) {
+                    damage = gameState.player1.weapon.baseDamage;
+                    weapon = gameState.player1.weapon;
+                }
+
                 damage = Math.floor(damage * gameState.player1.comboMultiplier);
 
                 if (checkHit(hitbox1, gameState.player2)) {
-                    if (gameState.player2.takeDamage(damage, gameState.player1)) {
-                        const knockback = gameState.player1.isKicking ? 5 : 3;
-                        gameState.player2.vx = gameState.player1.facingRight ? knockback : -knockback;
+                    if (gameState.player2.takeDamage(damage, gameState.player1, weapon)) {
+                        if (gameState.player1.isKicking) {
+                            const knockback = gameState.player1.facingRight ? 5 : 3;
+                            gameState.player2.vx = gameState.player1.facingRight ? knockback : -knockback;
+                        }
                     }
                 }
             }
 
+            // 玩家2攻击检测
             const hitbox2 = gameState.player2.getAttackHitbox();
             if (hitbox2) {
-                let damage = gameState.player2.isPunching ? 8 : 12;
+                let damage = 8;
+                let weapon = null;
+
+                if (gameState.player2.isPunching) {
+                    damage = 8;
+                } else if (gameState.player2.isKicking) {
+                    damage = 12;
+                } else if (gameState.player2.isUsingWeapon && gameState.player2.weapon) {
+                    damage = gameState.player2.weapon.baseDamage;
+                    weapon = gameState.player2.weapon;
+                }
+
                 damage = Math.floor(damage * gameState.player2.comboMultiplier);
 
                 if (checkHit(hitbox2, gameState.player1)) {
-                    if (gameState.player1.takeDamage(damage, gameState.player2)) {
-                        const knockback = gameState.player2.isKicking ? 5 : 3;
-                        gameState.player1.vx = gameState.player2.facingRight ? knockback : -knockback;
+                    if (gameState.player1.takeDamage(damage, gameState.player2, weapon)) {
+                        if (gameState.player2.isKicking) {
+                            const knockback = gameState.player2.isKicking ? 5 : 3;
+                            gameState.player1.vx = gameState.player2.facingRight ? knockback : -knockback;
+                        }
                     }
                 }
             }
@@ -1160,6 +1594,9 @@ HTML_TEMPLATE = """
 
         function drawGame() {
             drawBackground();
+            // 绘制掉落的武器
+            gameState.weapons.forEach(weapon => weapon.draw());
+            // 绘制玩家
             if (gameState.player1) gameState.player1.draw();
             if (gameState.player2) gameState.player2.draw();
         }
@@ -1194,9 +1631,13 @@ HTML_TEMPLATE = """
             gameState.paused = false;
             gameState.winner = null;
 
+            // 重置武器系统
+            gameState.weapons = [];
+            gameState.weaponDropTimer = 0;
+
             gameState.stats = {
-                p1: { hits: 0, damage: 0, maxCombo: 0 },
-                p2: { hits: 0, damage: 0, maxCombo: 0 }
+                p1: { hits: 0, damage: 0, maxCombo: 0, weaponsCollected: 0 },
+                p2: { hits: 0, damage: 0, maxCombo: 0, weaponsCollected: 0 }
             };
 
             document.getElementById('gameOverOverlay').classList.remove('show');
@@ -1209,6 +1650,8 @@ HTML_TEMPLATE = """
             if (gameState.hardcoreMode) {
                 showNotification('💀 硬核模式开启！伤害翻倍！', 1500);
             }
+
+            showNotification('🔄 游戏重置！武器将在5-10秒后随机掉落', 2000);
         }
 
         function togglePause() {
@@ -1254,6 +1697,20 @@ HTML_TEMPLATE = """
             } else {
                 indicator.style.display = 'none';
             }
+        }
+
+        // 显示武器系统说明
+        function showWeaponsInfo() {
+            // 分段显示，避免通知框过大
+            showNotification('⚔️ 创意武器系统说明 (1/3)', 1500);
+
+            setTimeout(() => {
+                showNotification('🔥 火焰剑 - 15伤害 + 燃烧\n⚡ 闪电锤 - 20伤害 + 击退\n🧊 冰霜弓 - 12伤害 + 减速\n💎 钻石匕首 - 25伤害 + 暴击\n🪓 战斧 - 22伤害 + 重击\n🎯 回旋镖 - 18伤害 + 特效', 2000);
+            }, 1600);
+
+            setTimeout(() => {
+                showNotification('🎯 机制：每5-10秒掉落\n🎯 靠近自动拾取\n🎯 F/J键使用武器\n🎯 武器有耐久度\n💡 顶部显示武器状态', 2500);
+            }, 3700);
         }
 
         // 全屏功能
@@ -1453,41 +1910,58 @@ def index():
 def health():
     return jsonify({
         "status": "healthy",
-        "service": "stickman-fighter-v2.5",
-        "version": "3.6",
-        "features": ["landscape_mode", "side_controls", "fullscreen", "larger_buttons", "game_loop_continuous", "player2_fixed", "reset_fixed"]
+        "service": "stickman-fighter-v2.6-weapon",
+        "version": "2.6",
+        "features": ["landscape_mode", "side_controls", "fullscreen", "larger_buttons", "game_loop_continuous", "player2_fixed", "reset_fixed", "weapon_system", "special_effects"]
     })
 
 @app.route('/api/stats')
 def stats():
     return jsonify({
-        "game": "Stickman Fighter V2.5",
-        "version": "3.6",
-        "description": "火柴人对战游戏 - 完整修复版",
+        "game": "Stickman Fighter V2.6",
+        "version": "2.6",
+        "description": "火柴人对战游戏 - 创意武器系统版",
         "features": [
-            "✅ 增大侧边按钮（更好操作）",
-            "✅ 修复玩家2按钮响应",
-            "✅ 修复游戏结束重置（循环持续运行）",
-            "✅ 游戏循环永不停止",
-            "最大化游戏画面",
-            "紧凑底部栏（不遮挡）",
-            "全屏模式按钮",
-            "顶部状态栏"
+            "✅ 创意武器系统（6种独特武器）",
+            "✅ 武器特殊效果（燃烧、击退、减速、暴击、眩晕）",
+            "✅ 自动掉落机制（每5-10秒）",
+            "✅ 武器耐久度系统",
+            "✅ 武器状态UI显示",
+            "✅ 侧边控制面板",
+            "✅ 全屏模式",
+            "✅ 游戏循环永不停止"
+        ],
+        "weapon_types": [
+            "🔥 火焰剑 - 燃烧效果",
+            "⚡ 闪电锤 - 击退+眩晕",
+            "🧊 冰霜弓 - 减速效果",
+            "💎 钻石匕首 - 暴击",
+            "🪓 战斧 - 重击",
+            "🎯 回旋镖 - 特殊效果"
         ]
     })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 启动服务器: http://localhost:{port}")
-    print("=" * 60)
-    print("🔥 火柴人对战 - V2.5 完整修复版")
-    print("=" * 60)
-    print("✅ 修复内容:")
-    print("  ✅ 游戏循环永不停止（gameOver时也继续循环）")
-    print("  ✅ 重置后立即恢复游戏运行")
-    print("  ✅ 侧边按钮增大（85px宽，48-52px高）")
-    print("  ✅ 玩家2按钮响应修复")
-    print("=" * 60)
+    print("=" * 70)
+    print("🔥 火柴人对战 - V2.6 创意武器系统版")
+    print("=" * 70)
+    print("⚔️ 新增武器系统:")
+    print("  🔥 火焰剑 - 燃烧持续伤害")
+    print("  ⚡ 闪电锤 - 击退+眩晕")
+    print("  🧊 冰霜弓 - 减速效果")
+    print("  💎 钻石匕首 - 高暴击")
+    print("  🪓 战斧 - 重击")
+    print("  🎯 回旋镖 - 特殊效果")
+    print("=" * 70)
+    print("🎯 游戏机制:")
+    print("  ✅ 武器每5-10秒自动掉落")
+    print("  ✅ 靠近自动拾取")
+    print("  ✅ 耐久度系统")
+    print("  ✅ 特殊效果可视化")
+    print("=" * 70)
     print(f"📱 访问: http://localhost:{port}")
-    print("=" * 60)
+    print("💡 按 ⚔️ 武器 按钮查看详细说明")
+    print("=" * 70)
     app.run(host='0.0.0.0', port=port, debug=False)
