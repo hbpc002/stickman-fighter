@@ -1,0 +1,48 @@
+# Render 蓝图配置文件
+# 使用此文件可以一键在 Render 上正确部署游戏
+# 上传到GitHub后，Render会自动检测并部署
+
+services:
+  # Python Web Service - 完整的游戏后端
+  - type: web
+    name: stickman-fighter
+    env: python
+    plan: free  # 免费计划
+
+    # 构建命令 - 安装依赖
+    buildCommand: pip install -r requirements.txt
+
+    # 启动命令 - 运行Flask应用
+    startCommand: python app.py
+
+    # 环境变量
+    envVars:
+      - key: PORT
+        value: 10000  # Render推荐使用10000端口
+      - key: PYTHON_VERSION
+        value: 3.11.2
+
+    # 健康检查
+    healthCheckPath: /api/health
+
+    # 部署触发器
+    autoDeploy: true  # 推送代码到GitHub时自动部署
+
+    # 资源配置
+    cpu: 0.1  # 0.1 vCPU
+    ram: 512MB  # 512MB内存
+
+    # 部署策略
+    buildPolicy: incremental  # 增量构建，更快
+
+# 如果你想用静态站点方式部署（不推荐，因为需要Flask后端）
+# 可以使用以下配置：
+#
+# services:
+#   - type: web
+#     name: stickman-fighter-static
+#     env: static
+#     buildCommand: echo "Static site"
+#     startCommand: echo "Serving static files"
+#     publishDirectory: .
+#     healthCheckPath: /standalone_test.html
