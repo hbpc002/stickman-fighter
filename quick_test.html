@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火柴人游戏 - 快速测试</title>
+    <style>
+        body { margin: 0; background: #222; font-family: Arial; color: white; }
+        #status { padding: 10px; background: #333; margin: 10px; border-radius: 5px; }
+        #gameContainer { display: flex; justify-content: center; padding: 10px; }
+        canvas { border: 3px solid #fff; background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%); }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; background: #444; color: white; border: 1px solid #666; }
+        button:hover { background: #666; }
+    </style>
+</head>
+<body>
+    <div id="status">初始化中...</div>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+    <div style="text-align: center; margin: 10px;">
+        <button onclick="testGame()">🎮 测试游戏</button>
+        <button onclick="testFullscreen()">🖥️ 测试全屏</button>
+        <button onclick="testKeyboard()">⌨️ 测试键盘</button>
+    </div>
+
+    <script>
+        const status = document.getElementById('status');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const keys = {};
+
+        function updateStatus(msg, type = 'normal') {
+            const color = type === 'success' ? '#0f0' : type === 'error' ? '#f00' : type === 'warning' ? '#ff0' : '#fff';
+            status.innerHTML += `<div style="color: ${color}">${msg}</div>`;
+            console.log(msg);
+        }
+
+        // 测试1: 基础环境
+        function testEnvironment() {
+            status.innerHTML = '';
+            updateStatus('=== 环境测试 ===');
+
+            if (!canvas) {
+                updateStatus('❌ Canvas未找到', 'error');
+                return false;
+            }
+            updateStatus('✅ Canvas找到', 'success');
+
+            if (!ctx) {
+                updateStatus('❌ Canvas上下文未创建', 'error');
+                return false;
+            }
+            updateStatus('✅ Canvas上下文创建成功', 'success');
+
+            updateStatus(`Canvas尺寸: ${canvas.width}x${canvas.height}`, 'success');
+            return true;
+        }
+
+        // 测试2: 绘制背景
+        function testBackground() {
+            updateStatus('=== 背景绘制测试 ===');
+            try {
+                // 天空
+                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, '#87CEEB');
+                gradient.addColorStop(1, '#B0E0E6');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 太阳
+                ctx.beginPath();
+                ctx.arc(550, 60, 15, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFD700';
+                ctx.fill();
+
+                // 云朵
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath(); ctx.arc(100, 70, 15, 0, Math.PI * 2);
+                ctx.arc(112, 65, 18, 0, Math.PI * 2);
+                ctx.arc(124, 70, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 地面
+                const groundY = canvas.height - 80;
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(0, groundY, canvas.width, 80);
+
+                updateStatus('✅ 背景绘制成功', 'success');
+                return true;
+            } catch(e) {
+                updateStatus(`❌ 背景绘制失败: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        // 测试3: 绘制火柴人
+        function drawStickman(x, y, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            // 头
+            ctx.beginPath();
+            ctx.arc(x, y + 8, 8, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 身体
+            ctx.beginPath();
+            ctx.moveTo(x, y + 15);
+            ctx.lineTo(x, y + 40);
+            ctx.stroke();
+
+            // 腿
+            ctx.beginPath();
+            ctx.moveTo(x, y + 40);
+            ctx.lineTo(x - 6, y + 60);
+            ctx.moveTo(x, y + 40);
+            ctx.lineTo(x + 6, y + 60);
+            ctx.stroke();
+
+            // 手臂
+            ctx.beginPath();
+            ctx.moveTo(x, y + 20);
+            ctx.lineTo(x + 12, y + 20);
+            ctx.moveTo(x, y + 20);
+            ctx.lineTo(x - 8, y + 23);
+            ctx.stroke();
+        }
+
+        function testCharacters() {
+            updateStatus('=== 角色绘制测试 ===');
+            try {
+                drawStickman(200, 150, '#ff6b6b'); // 玩家1
+                drawStickman(400, 150, '#4dabf7'); // 玩家2
+                updateStatus('✅ 火柴人绘制成功', 'success');
+                return true;
+            } catch(e) {
+                updateStatus(`❌ 角色绘制失败: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        // 测试4: 动画循环
+        let animRunning = false;
+        let animX = 200;
+        let animDir = 1;
+
+        function testAnimation() {
+            updateStatus('=== 动画测试 ===');
+            animRunning = true;
+
+            function animate() {
+                if (!animRunning) return;
+
+                // 重绘背景
+                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, '#87CEEB');
+                gradient.addColorStop(1, '#B0E0E6');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 地面
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+
+                // 移动的火柴人
+                animX += animDir * 2;
+                if (animX > 400 || animX < 200) animDir *= -1;
+
+                drawStickman(animX, 150, '#ff6b6b');
+                drawStickman(350, 150, '#4dabf7');
+
+                // 显示状态
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.fillText(`位置: ${animX}`, 10, 20);
+                ctx.fillText('动画运行中...', 10, 40);
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            updateStatus('✅ 动画开始运行', 'success');
+            updateStatus('💡 如果看到火柴人移动，说明一切正常！', 'warning');
+        }
+
+        // 测试5: 键盘输入
+        function testKeyboard() {
+            updateStatus('=== 键盘测试 ===');
+            updateStatus('请按任意方向键或WASD测试...', 'warning');
+
+            const testKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'];
+            let detected = false;
+
+            function keyHandler(e) {
+                if (testKeys.includes(e.key) && !detected) {
+                    detected = true;
+                    updateStatus(`✅ 检测到按键: ${e.key}`, 'success');
+                    window.removeEventListener('keydown', keyHandler);
+                }
+            }
+
+            window.addEventListener('keydown', keyHandler);
+            setTimeout(() => {
+                if (!detected) {
+                    updateStatus('⚠️ 未检测到按键事件', 'warning');
+                    window.removeEventListener('keydown', keyHandler);
+                }
+            }, 3000);
+        }
+
+        // 测试6: 全屏功能
+        function testFullscreen() {
+            updateStatus('=== 全屏测试 ===');
+            try {
+                const elem = document.documentElement;
+                if (!document.fullscreenElement) {
+                    elem.requestFullscreen().then(() => {
+                        updateStatus('✅ 全屏成功', 'success');
+                    }).catch(e => {
+                        updateStatus(`❌ 全屏失败: ${e.message}`, 'error');
+                    });
+                } else {
+                    document.exitFullscreen();
+                    updateStatus('✅ 退出全屏', 'success');
+                }
+            } catch(e) {
+                updateStatus(`❌ 全屏功能错误: ${e.message}`, 'error');
+            }
+        }
+
+        // 完整测试流程
+        function testGame() {
+            if (!testEnvironment()) return;
+            if (!testBackground()) return;
+            if (!testCharacters()) return;
+
+            updateStatus('=== 完整测试总结 ===');
+            updateStatus('🎉 如果看到背景和两个火柴人，说明游戏核心正常！', 'success');
+            updateStatus('💡 点击"测试全屏"验证全屏功能', 'warning');
+            updateStatus('💡 点击"测试键盘"验证按键输入', 'warning');
+
+            testAnimation();
+        }
+
+        // 键盘事件监听
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // 页面加载时自动测试
+        window.addEventListener('load', () => {
+            updateStatus('🔥 火柴人游戏快速测试工具');
+            updateStatus('点击"测试游戏"按钮开始完整测试');
+            updateStatus('或直接点击下面的按钮进行单项测试');
+        });
+    </script>
+</body>
+</html>
