@@ -656,12 +656,12 @@ HTML_TEMPLATE = """
 
     <!-- 底部功能按钮 - 修复位置 -->
     <div class="bottom-controls" id="bottomControls">
-        <button class="func-btn fullscreen" onclick="toggleFullscreen()">🖥️ 全屏</button>
-        <button class="func-btn" onclick="togglePause()">⏸️ 暂停</button>
-        <button class="func-btn warning" onclick="toggleAI()" id="aiBtn">🤖 AI</button>
-        <button class="func-btn danger" onclick="toggleHardcore()" id="hardcoreBtn">💀 硬核</button>
-        <button class="func-btn" onclick="resetGame()">🔄 重置</button>
-        <button class="func-btn" onclick="showWeaponsInfo()">⚔️ 武器</button>
+        <button class="func-btn fullscreen" id="fullscreenBtn">🖥️ 全屏</button>
+        <button class="func-btn" id="pauseBtn">⏸️ 暂停</button>
+        <button class="func-btn warning" id="aiBtn">🤖 AI</button>
+        <button class="func-btn danger" id="hardcoreBtn">💀 硬核</button>
+        <button class="func-btn" id="resetBtn">🔄 重置</button>
+        <button class="func-btn" id="weaponsBtn">⚔️ 武器</button>
     </div>
 
     <div id="notification" class="notification"></div>
@@ -1487,16 +1487,27 @@ HTML_TEMPLATE = """
             // 总是绘制游戏，即使在暂停或游戏结束状态
             drawGame();
 
+            // 检查游戏状态，确保玩家存在
+            if (!gameState.player1 || !gameState.player2) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
             if (gameState.paused) {
+                // 暂停时仍然显示状态
+                updateUI();
                 requestAnimationFrame(gameLoop);
                 return;
             }
 
             if (gameState.gameOver) {
+                // 游戏结束时仍然显示状态
+                updateUI();
                 requestAnimationFrame(gameLoop);
                 return;
             }
 
+            // 只有在游戏进行中才更新逻辑
             gameState.player1.handleInput();
             gameState.player1.update();
             gameState.player2.update();
@@ -1594,6 +1605,12 @@ HTML_TEMPLATE = """
         }
 
         function drawGame() {
+            // 确保canvas和context存在
+            if (!canvas || !ctx) {
+                console.log('❌ Canvas或Context未准备好');
+                return;
+            }
+
             // 清空画布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1601,21 +1618,21 @@ HTML_TEMPLATE = """
             drawBackground();
 
             // 绘制掉落的武器
-            if (gameState.weapons) {
-                gameState.weapons.forEach(weapon => weapon.draw());
+            if (gameState.weapons && gameState.weapons.length > 0) {
+                gameState.weapons.forEach(weapon => {
+                    if (weapon && weapon.draw) {
+                        weapon.draw();
+                    }
+                });
             }
 
             // 绘制玩家
-            if (gameState.player1) {
+            if (gameState.player1 && gameState.player1.draw) {
                 gameState.player1.draw();
-            } else {
-                console.log('⚠️ player1 未初始化');
             }
 
-            if (gameState.player2) {
+            if (gameState.player2 && gameState.player2.draw) {
                 gameState.player2.draw();
-            } else {
-                console.log('⚠️ player2 未初始化');
             }
         }
 
@@ -1632,6 +1649,12 @@ HTML_TEMPLATE = """
         function resetGame() {
             const health = gameState.hardcoreMode ? 75 : 100;
             const stamina = gameState.hardcoreMode ? 80 : 100;
+
+            // 确保canvas尺寸正确
+            if (canvas.width === 0 || canvas.height === 0) {
+                console.log('⚠️ Canvas尺寸异常，尝试修复...');
+                resizeCanvas();
+            }
 
             gameState.player1 = new Stickman(150, 200, '#ff6b6b', {
                 left: 'a', right: 'd', jump: 'w', punch: 'f', kick: 'g'
@@ -1658,10 +1681,15 @@ HTML_TEMPLATE = """
                 p2: { hits: 0, damage: 0, maxCombo: 0, weaponsCollected: 0 }
             };
 
-            document.getElementById('gameOverOverlay').classList.remove('show');
-            document.getElementById('comboIndicator').classList.remove('show');
+            // 立即更新UI
+            const overlay = document.getElementById('gameOverOverlay');
+            const comboIndicator = document.getElementById('comboIndicator');
+            if (overlay) overlay.classList.remove('show');
+            if (comboIndicator) comboIndicator.classList.remove('show');
+
             updateUI();
 
+            // 显示通知
             if (gameState.aiEnabled) {
                 showNotification('🤖 AI对战模式已启用！', 1500);
             }
@@ -1670,6 +1698,8 @@ HTML_TEMPLATE = """
             }
 
             showNotification('🔄 游戏重置！武器将在5-10秒后随机掉落', 2000);
+
+            console.log('✅ 游戏重置完成');
         }
 
         function togglePause() {
@@ -1734,6 +1764,9 @@ HTML_TEMPLATE = """
         // 全屏功能
         function toggleFullscreen() {
             try {
+                // 首先初始化音频（需要用户交互）
+                initAudio();
+
                 const elem = document.documentElement;
 
                 if (!document.fullscreenElement) {
@@ -1910,6 +1943,109 @@ HTML_TEMPLATE = """
             }
         }
 
+        // 设置底部功能按钮事件
+        function setupBottomButtons() {
+            // 全屏按钮
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleFullscreen();
+                });
+                fullscreenBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleFullscreen();
+                });
+            }
+
+            // 暂停按钮
+            const pauseBtn = document.getElementById('pauseBtn');
+            if (pauseBtn) {
+                pauseBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    togglePause();
+                });
+                pauseBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    togglePause();
+                });
+            }
+
+            // AI按钮
+            const aiBtn = document.getElementById('aiBtn');
+            if (aiBtn) {
+                aiBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    toggleAI();
+                });
+                aiBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    toggleAI();
+                });
+            }
+
+            // 硬核按钮
+            const hardcoreBtn = document.getElementById('hardcoreBtn');
+            if (hardcoreBtn) {
+                hardcoreBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    toggleHardcore();
+                });
+                hardcoreBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    toggleHardcore();
+                });
+            }
+
+            // 重置按钮（底部）
+            const resetBtn = document.getElementById('resetBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    resetGame();
+                });
+                resetBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    resetGame();
+                });
+            }
+
+            // 武器信息按钮
+            const weaponsBtn = document.getElementById('weaponsBtn');
+            if (weaponsBtn) {
+                weaponsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    showWeaponsInfo();
+                });
+                weaponsBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    initAudio();
+                    showWeaponsInfo();
+                });
+            }
+        }
+
         // 初始化
         window.addEventListener('load', () => {
             console.log('🎮 游戏初始化开始...');
@@ -1917,22 +2053,26 @@ HTML_TEMPLATE = """
             detectDevice();
             setupVirtualControls();
             setupResetButton();
-            resetGame();
-            resizeCanvas();
+            setupBottomButtons();
 
-            // 检查canvas是否准备好
+            // 确保canvas准备好
             const canvas = document.getElementById('gameCanvas');
             if (canvas && canvas.getContext) {
                 console.log('✅ Canvas准备就绪');
                 console.log('Canvas尺寸:', canvas.width, 'x', canvas.height);
-                console.log('Canvas样式尺寸:', canvas.style.width, canvas.style.height);
+
+                // 先调整大小，再重置游戏
+                resizeCanvas();
+                resetGame();
+
+                // 开始游戏循环
+                gameLoop();
+                showNotification('🎮 游戏加载完成！按 R 重新开始', 2000);
+                console.log('🎉 游戏初始化完成');
             } else {
                 console.log('❌ Canvas未找到或不支持');
+                showNotification('❌ 初始化失败：Canvas未找到', 3000);
             }
-
-            gameLoop();
-            showNotification('🎮 游戏加载完成！按 R 重新开始', 2000);
-            console.log('🎉 游戏初始化完成');
         });
     </script>
 </body>
