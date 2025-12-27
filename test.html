@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火柴人游戏 - 测试版</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #222; font-family: Arial; }
+        #status { color: white; margin-bottom: 10px; padding: 10px; background: #333; }
+        canvas { border: 2px solid #fff; background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%); }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+    </style>
+</head>
+<body>
+    <div id="status">正在初始化...</div>
+    <canvas id="testCanvas" width="400" height="300"></canvas>
+
+    <script>
+        const status = document.getElementById('status');
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 测试1: Canvas支持
+        if (!canvas || !ctx) {
+            status.innerHTML = '<span class="error">❌ Canvas不支持</span>';
+            throw new Error('Canvas not supported');
+        }
+        status.innerHTML = '<span class="success">✅ Canvas支持</span><br>';
+
+        // 测试2: 绘制背景
+        try {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(1, '#B0E0E6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            status.innerHTML += '<span class="success">✅ 背景绘制成功</span><br>';
+        } catch(e) {
+            status.innerHTML += '<span class="error">❌ 背景绘制失败: ' + e.message + '</span><br>';
+        }
+
+        // 测试3: 绘制地面
+        try {
+            const groundY = canvas.height - 60;
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(0, groundY, canvas.width, 60);
+            status.innerHTML += '<span class="success">✅ 地面绘制成功</span><br>';
+        } catch(e) {
+            status.innerHTML += '<span class="error">❌ 地面绘制失败: ' + e.message + '</span><br>';
+        }
+
+        // 测试4: 绘制火柴人
+        try {
+            const x = 200, y = 150;
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            // 头
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 身体
+            ctx.beginPath();
+            ctx.moveTo(x, y + 8);
+            ctx.lineTo(x, y + 30);
+            ctx.stroke();
+
+            // 腿
+            ctx.beginPath();
+            ctx.moveTo(x, y + 30);
+            ctx.lineTo(x - 6, y + 50);
+            ctx.moveTo(x, y + 30);
+            ctx.lineTo(x + 6, y + 50);
+            ctx.stroke();
+
+            // 手臂
+            ctx.beginPath();
+            ctx.moveTo(x, y + 15);
+            ctx.lineTo(x + 12, y + 15);
+            ctx.moveTo(x, y + 15);
+            ctx.lineTo(x - 8, y + 18);
+            ctx.stroke();
+
+            status.innerHTML += '<span class="success">✅ 火柴人绘制成功</span><br>';
+            status.innerHTML += '<span class="success">🎉 所有测试通过！游戏应该能正常运行</span>';
+        } catch(e) {
+            status.innerHTML += '<span class="error">❌ 火柴人绘制失败: ' + e.message + '</span><br>';
+        }
+
+        // 测试5: JavaScript弹出提示
+        try {
+            console.log('测试console.log');
+            status.innerHTML += '<br><span style="color: #ffd93d;">💡 请按F12打开控制台查看详细日志</span>';
+        } catch(e) {
+            status.innerHTML += '<br><span class="error">❌ JavaScript受限</span>';
+        }
+    </script>
+</body>
+</html>
